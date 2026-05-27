@@ -126,21 +126,60 @@ def poly_iou(poly_det, poly_gt):
 
 def poly_nms(polygons, threshold):
     assert isinstance(polygons, list)
+    if len(polygons) == 0:
+        return []
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
     keep_poly = []
-    index = [i for i in range(polygons.shape[0])]
 
-    while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
-        index = np.delete(index, -1)
-        iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
-        remove_index = np.where(iou_list > threshold)
-        index = np.delete(index, remove_index)
+    # Precompute polygons once
+    polys = []
+    for i in range(polygons.shape[0]):
+        pts = polygons[i][:-1]
+        if valid_boundary(pts, False):
+            polys.append(points2polygon(pts))
+        else:
+            polys.append(None)
+
+    order = list(range(polygons.shape[0]))
+
+    while len(order) > 0:
+        idx = order[-1]
+        keep_poly.append(polygons[idx].tolist())
+        A_poly = polys[idx]
+        order.pop()
+
+        if len(order) == 0:
+            break
+
+        if A_poly is not None:
+            keep_indices = []
+            for i in range(len(order)):
+                idx2 = order[i]
+                B_poly = polys[idx2]
+                if B_poly is not None:
+                    # check bbox overlap first to fast reject
+                    # A_poly.bounds gives (minx, miny, maxx, maxy)
+                    a_minx, a_miny, a_maxx, a_maxy = A_poly.bounds
+                    b_minx, b_miny, b_maxx, b_maxy = B_poly.bounds
+
+                    if (a_maxx < b_minx or a_minx > b_maxx or
+                        a_maxy < b_miny or a_miny > b_maxy):
+                        keep_indices.append(idx2)
+                        continue
+
+                    iou = poly_iou(A_poly, B_poly)
+                    if iou <= threshold:
+                        keep_indices.append(idx2)
+                else:
+                    keep_indices.append(idx2)
+            order = keep_indices
+        else:
+            # If A_poly is invalid, we don't suppress anything else,
+            # but we still want to filter valid/invalid correctly.
+            # In original code, it calculates boundary_iou which throws error or returns 0.
+            # Assuming 0 if invalid.
+            pass
 
     return keep_poly
