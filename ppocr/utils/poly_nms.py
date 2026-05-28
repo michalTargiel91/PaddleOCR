@@ -130,16 +130,28 @@ def poly_nms(polygons, threshold):
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
     keep_poly = []
-    index = [i for i in range(polygons.shape[0])]
+    index = np.arange(polygons.shape[0])
 
-    while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
-        index = np.delete(index, -1)
-        iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+    # Pre-compute shapely polygons
+    shapely_polys = []
+    for p in polygons:
+        poly = points2polygon(p[:-1])
+        shapely_polys.append(poly)
+
+    while index.size > 0:
+        last = index[-1]
+        keep_poly.append(polygons[last].tolist())
+        A = shapely_polys[last]
+
+        index = index[:-1]
+        if index.size == 0:
+            break
+
+        iou_list = np.zeros(index.size)
+        for i, idx in enumerate(index):
+            B = shapely_polys[idx]
+            iou_list[i] = poly_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
