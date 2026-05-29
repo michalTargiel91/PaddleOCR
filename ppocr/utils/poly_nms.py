@@ -132,14 +132,43 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # ⚡ Bolt: Pre-compute Polygon objects, buffered geometries, and areas
+    # to avoid redundant O(N^2) instantiations and buffering inside the NMS loop.
+    poly_buf_list = []
+    poly_area_list = []
+
+    for i in range(polygons.shape[0]):
+        poly = points2polygon(polygons[i][:-1])
+        # buffer=0.0001 is used in poly_intersection
+        poly_buf_list.append(poly.buffer(0.0001))
+        poly_area_list.append(poly.area)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A_poly_buf = poly_buf_list[A_idx]
+        A_area = poly_area_list[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_poly_buf = poly_buf_list[B_idx]
+            B_area = poly_area_list[B_idx]
+
+            # Equivalent to poly_intersection with buffer=0.0001
+            poly_inter = A_poly_buf & B_poly_buf
+            area_inters = poly_inter.area
+
+            # Equivalent to poly_union
+            area_union = A_area + B_area - area_inters
+
+            if area_union == 0:
+                iou = 0.0
+            else:
+                iou = area_inters / area_union
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
