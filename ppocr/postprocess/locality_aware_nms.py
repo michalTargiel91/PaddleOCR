@@ -7,6 +7,20 @@ import numpy as np
 from shapely.geometry import Polygon
 
 
+def poly_intersection(poly1, poly2):
+    """
+    Intersection between two shapely Polygon objects.
+    """
+    if not poly1.is_valid or not poly2.is_valid:
+        return 0
+    inter = poly1.intersection(poly2).area
+    union = poly1.area + poly2.area - inter
+    if union == 0:
+        return 0
+    else:
+        return inter / union
+
+
 def intersection(g, p):
     """
     Intersection.
@@ -15,14 +29,7 @@ def intersection(g, p):
     p = Polygon(p[:8].reshape((4, 2)))
     g = g.buffer(0)
     p = p.buffer(0)
-    if not g.is_valid or not p.is_valid:
-        return 0
-    inter = Polygon(g).intersection(Polygon(p)).area
-    union = g.area + p.area - inter
-    if union == 0:
-        return 0
-    else:
-        return inter / union
+    return poly_intersection(g, p)
 
 
 def intersection_iog(g, p):
@@ -33,7 +40,7 @@ def intersection_iog(g, p):
     p = Polygon(p[:8].reshape((4, 2)))
     if not g.is_valid or not p.is_valid:
         return 0
-    inter = Polygon(g).intersection(Polygon(p)).area
+    inter = g.intersection(p).area
     # union = g.area + p.area - inter
     union = p.area
     if union == 0:
@@ -58,10 +65,21 @@ def standard_nms(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    if len(S) == 0:
+        return S[keep]
+
+    polygons = [Polygon(p[:8].reshape((4, 2))).buffer(0) for p in S]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
+        poly_i = polygons[i]
+
+        ovr = []
+        for t in order[1:]:
+            ovr.append(poly_intersection(poly_i, polygons[t]))
+        ovr = np.array(ovr)
 
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
@@ -75,10 +93,21 @@ def standard_nms_inds(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    if len(S) == 0:
+        return keep
+
+    polygons = [Polygon(p[:8].reshape((4, 2))).buffer(0) for p in S]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
+        poly_i = polygons[i]
+
+        ovr = []
+        for t in order[1:]:
+            ovr.append(poly_intersection(poly_i, polygons[t]))
+        ovr = np.array(ovr)
 
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
@@ -92,10 +121,21 @@ def nms(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    if len(S) == 0:
+        return keep
+
+    polygons = [Polygon(p[:8].reshape((4, 2))).buffer(0) for p in S]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
+        poly_i = polygons[i]
+
+        ovr = []
+        for t in order[1:]:
+            ovr.append(poly_intersection(poly_i, polygons[t]))
+        ovr = np.array(ovr)
 
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
@@ -116,6 +156,9 @@ def soft_nms(boxes_in, Nt_thres=0.3, threshold=0.8, sigma=0.5, method=2):
     N = boxes.shape[0]
     if N is None or N < 1:
         return np.array([])
+
+    polygons = [Polygon(p[:8].reshape((4, 2))).buffer(0) for p in boxes]
+
     pos, maxpos = 0, 0
     weight = 0.0
     inds = np.arange(N)
@@ -135,15 +178,20 @@ def soft_nms(boxes_in, Nt_thres=0.3, threshold=0.8, sigma=0.5, method=2):
         # add max box as a detection
         boxes[i, :] = boxes[maxpos, :]
         inds[i] = inds[maxpos]
+        # swap polygons
+        polygons[i], polygons[maxpos] = polygons[maxpos], polygons[i]
+
         # swap
         boxes[maxpos, :] = tbox
         inds[maxpos] = ti
         tbox = boxes[i].copy()
+        tpoly = polygons[i]
         pos = i + 1
         # NMS iteration
         while pos < N:
             sbox = boxes[pos].copy()
-            ts_iou_val = intersection(tbox, sbox)
+            spoly = polygons[pos]
+            ts_iou_val = poly_intersection(tpoly, spoly)
             if ts_iou_val > 0:
                 if method == 1:
                     if ts_iou_val > Nt_thres:
@@ -163,6 +211,7 @@ def soft_nms(boxes_in, Nt_thres=0.3, threshold=0.8, sigma=0.5, method=2):
                 if boxes[pos, 8] < threshold:
                     boxes[pos, :] = boxes[N - 1, :]
                     inds[pos] = inds[N - 1]
+                    polygons[pos] = polygons[N - 1]
                     N = N - 1
                     pos = pos - 1
             pos = pos + 1
