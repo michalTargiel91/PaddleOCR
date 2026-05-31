@@ -129,17 +129,37 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Pre-compute shapely polygons
+    shapely_polygons = [Polygon(p[:-1].reshape([-1, 2])).buffer(0) for p in polygons]
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        idx_last = index[-1]
+        keep_poly.append(polygons[idx_last].tolist())
+        poly_A = shapely_polygons[idx_last]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            idx_B = index[i]
+            poly_B = shapely_polygons[idx_B]
+
+            # Validation matching locality_aware_nms
+            if not poly_A.is_valid or not poly_B.is_valid:
+                iou_list[i] = 0.0
+                continue
+
+            # Inline poly_iou without wrappers
+            area_inters = poly_A.intersection(poly_B).area
+            area_union = poly_A.area + poly_B.area - area_inters
+            if area_union == 0:
+                iou_list[i] = 0.0
+            else:
+                iou_list[i] = area_inters / area_union
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 

@@ -58,10 +58,27 @@ def standard_nms(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    # Pre-compute polygons and buffer
+    polygons = [Polygon(s[:8].reshape((4, 2))).buffer(0) for s in S]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
+
+        poly_i = polygons[i]
+        ovr = np.zeros(order.size - 1)
+        for idx, t in enumerate(order[1:]):
+            poly_t = polygons[t]
+            if not poly_i.is_valid or not poly_t.is_valid:
+                ovr[idx] = 0
+                continue
+            inter = poly_i.intersection(poly_t).area
+            union = poly_i.area + poly_t.area - inter
+            if union == 0:
+                ovr[idx] = 0
+            else:
+                ovr[idx] = inter / union
 
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
@@ -75,10 +92,27 @@ def standard_nms_inds(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    # Pre-compute polygons and buffer
+    polygons = [Polygon(s[:8].reshape((4, 2))).buffer(0) for s in S]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
+
+        poly_i = polygons[i]
+        ovr = np.zeros(order.size - 1)
+        for idx, t in enumerate(order[1:]):
+            poly_t = polygons[t]
+            if not poly_i.is_valid or not poly_t.is_valid:
+                ovr[idx] = 0
+                continue
+            inter = poly_i.intersection(poly_t).area
+            union = poly_i.area + poly_t.area - inter
+            if union == 0:
+                ovr[idx] = 0
+            else:
+                ovr[idx] = inter / union
 
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
@@ -92,10 +126,27 @@ def nms(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    # Pre-compute polygons and buffer
+    polygons = [Polygon(s[:8].reshape((4, 2))).buffer(0) for s in S]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
+
+        poly_i = polygons[i]
+        ovr = np.zeros(order.size - 1)
+        for idx, t in enumerate(order[1:]):
+            poly_t = polygons[t]
+            if not poly_i.is_valid or not poly_t.is_valid:
+                ovr[idx] = 0
+                continue
+            inter = poly_i.intersection(poly_t).area
+            union = poly_i.area + poly_t.area - inter
+            if union == 0:
+                ovr[idx] = 0
+            else:
+                ovr[idx] = inter / union
 
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
