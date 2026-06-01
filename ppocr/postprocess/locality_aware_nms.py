@@ -58,11 +58,34 @@ def standard_nms(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    if S.shape[0] == 0:
+        return np.array([])
+
+    polys = [Polygon(box[:8].reshape((4, 2))).buffer(0) for box in S]
+    areas = [p.area for p in polys]
+    valid = [p.is_valid for p in polys]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
 
+        pi, ai, vi = polys[i], areas[i], valid[i]
+
+        ovr = []
+        for t in order[1:]:
+            pt, at, vt = polys[t], areas[t], valid[t]
+            if not vi or not vt:
+                ovr.append(0)
+            else:
+                inter = pi.intersection(pt).area
+                union = ai + at - inter
+                if union == 0:
+                    ovr.append(0)
+                else:
+                    ovr.append(inter / union)
+
+        ovr = np.array(ovr)
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
 
@@ -75,11 +98,34 @@ def standard_nms_inds(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    if S.shape[0] == 0:
+        return keep
+
+    polys = [Polygon(box[:8].reshape((4, 2))).buffer(0) for box in S]
+    areas = [p.area for p in polys]
+    valid = [p.is_valid for p in polys]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
 
+        pi, ai, vi = polys[i], areas[i], valid[i]
+
+        ovr = []
+        for t in order[1:]:
+            pt, at, vt = polys[t], areas[t], valid[t]
+            if not vi or not vt:
+                ovr.append(0)
+            else:
+                inter = pi.intersection(pt).area
+                union = ai + at - inter
+                if union == 0:
+                    ovr.append(0)
+                else:
+                    ovr.append(inter / union)
+
+        ovr = np.array(ovr)
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
 
@@ -92,11 +138,34 @@ def nms(S, thres):
     """
     order = np.argsort(S[:, 8])[::-1]
     keep = []
+
+    if S.shape[0] == 0:
+        return keep
+
+    polys = [Polygon(box[:8].reshape((4, 2))).buffer(0) for box in S]
+    areas = [p.area for p in polys]
+    valid = [p.is_valid for p in polys]
+
     while order.size > 0:
         i = order[0]
         keep.append(i)
-        ovr = np.array([intersection(S[i], S[t]) for t in order[1:]])
 
+        pi, ai, vi = polys[i], areas[i], valid[i]
+
+        ovr = []
+        for t in order[1:]:
+            pt, at, vt = polys[t], areas[t], valid[t]
+            if not vi or not vt:
+                ovr.append(0)
+            else:
+                inter = pi.intersection(pt).area
+                union = ai + at - inter
+                if union == 0:
+                    ovr.append(0)
+                else:
+                    ovr.append(inter / union)
+
+        ovr = np.array(ovr)
         inds = np.where(ovr <= thres)[0]
         order = order[inds + 1]
 
@@ -116,15 +185,19 @@ def soft_nms(boxes_in, Nt_thres=0.3, threshold=0.8, sigma=0.5, method=2):
     N = boxes.shape[0]
     if N is None or N < 1:
         return np.array([])
+
+    polys = [Polygon(box[:8].reshape((4, 2))).buffer(0) for box in boxes]
+    areas = [p.area for p in polys]
+    valid = [p.is_valid for p in polys]
+
     pos, maxpos = 0, 0
     weight = 0.0
     inds = np.arange(N)
-    tbox, sbox = boxes[0].copy(), boxes[0].copy()
+
     for i in range(N):
         maxscore = boxes[i, 8]
         maxpos = i
-        tbox = boxes[i].copy()
-        ti = inds[i]
+
         pos = i + 1
         # get max box
         while pos < N:
@@ -132,18 +205,33 @@ def soft_nms(boxes_in, Nt_thres=0.3, threshold=0.8, sigma=0.5, method=2):
                 maxscore = boxes[pos, 8]
                 maxpos = pos
             pos = pos + 1
-        # add max box as a detection
-        boxes[i, :] = boxes[maxpos, :]
-        inds[i] = inds[maxpos]
+
         # swap
-        boxes[maxpos, :] = tbox
-        inds[maxpos] = ti
         tbox = boxes[i].copy()
+        boxes[i, :] = boxes[maxpos, :]
+        boxes[maxpos, :] = tbox
+
+        ti = inds[i]
+        inds[i] = inds[maxpos]
+        inds[maxpos] = ti
+
+        tpoly, tarea, tvalid = polys[i], areas[i], valid[i]
+        polys[i], areas[i], valid[i] = polys[maxpos], areas[maxpos], valid[maxpos]
+        polys[maxpos], areas[maxpos], valid[maxpos] = tpoly, tarea, tvalid
+
         pos = i + 1
         # NMS iteration
         while pos < N:
-            sbox = boxes[pos].copy()
-            ts_iou_val = intersection(tbox, sbox)
+            pi, ai, vi = polys[i], areas[i], valid[i]
+            ppos, apos, vpos = polys[pos], areas[pos], valid[pos]
+
+            ts_iou_val = 0.0
+            if vi and vpos:
+                inter = pi.intersection(ppos).area
+                union = ai + apos - inter
+                if union > 0:
+                    ts_iou_val = inter / union
+
             if ts_iou_val > 0:
                 if method == 1:
                     if ts_iou_val > Nt_thres:
@@ -163,6 +251,11 @@ def soft_nms(boxes_in, Nt_thres=0.3, threshold=0.8, sigma=0.5, method=2):
                 if boxes[pos, 8] < threshold:
                     boxes[pos, :] = boxes[N - 1, :]
                     inds[pos] = inds[N - 1]
+
+                    polys[pos] = polys[N - 1]
+                    areas[pos] = areas[N - 1]
+                    valid[pos] = valid[N - 1]
+
                     N = N - 1
                     pos = pos - 1
             pos = pos + 1
