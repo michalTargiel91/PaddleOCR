@@ -125,6 +125,12 @@ def poly_iou(poly_det, poly_gt):
 
 
 def poly_nms(polygons, threshold):
+    """
+    ⚡ Bolt Optimization:
+    Pre-compute Shapely Polygon objects and their buffered forms in O(N).
+    This avoids redundant instantiation and buffering inside the O(N^2) NMS loop,
+    drastically improving performance for a large number of polygons.
+    """
     assert isinstance(polygons, list)
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
@@ -132,14 +138,32 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Pre-compute buffered Polygon objects and areas
+    poly_objs = []
+    poly_areas = []
+    for p in polygons:
+        poly = points2polygon(p[:-1]).buffer(0.0001)
+        poly_objs.append(poly)
+        poly_areas.append(poly.area)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_poly = poly_objs[index[-1]]
+        A_area = poly_areas[index[-1]]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_poly = poly_objs[index[i]]
+            B_area = poly_areas[index[i]]
+
+            poly_inter = A_poly & B_poly
+            area_inters = poly_inter.area
+            area_union = A_area + B_area - area_inters
+            if area_union == 0:
+                iou_list[i] = 0.0
+            else:
+                iou_list[i] = area_inters / area_union
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
