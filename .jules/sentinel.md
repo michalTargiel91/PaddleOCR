@@ -1,0 +1,4 @@
+## 2024-06-25 - Insecure YAML Deserialization in Config Parsing
+**Vulnerability:** Arbitrary code execution via insecure YAML deserialization using `yaml.load(..., Loader=yaml.Loader)` across multiple config-loading components (`tools/program.py`, `test_tipc/supplementary/config.py`, `configs/rec/multi_language/generate_multi_language_configs.py`, `benchmark/PaddleOCR_DBNet/utils/util.py`).
+**Learning:** `yaml.Loader` provides the ability to construct arbitrary Python objects, leaving the application vulnerable if user-provided configuration strings or files are parsed. This is common in CLI-driven parameter injection (e.g., parsing args using `s.split("=")`) or loading files via `open(...)`.
+**Prevention:** Always use `yaml.safe_load(stream)` or `yaml.load(stream, Loader=yaml.SafeLoader)` to explicitly restrict deserialization to basic standard YAML tags.
