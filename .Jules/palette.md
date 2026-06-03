@@ -1,0 +1,3 @@
+## 2024-06-03 - Test Environments Need Accessibility Standards Too
+**Learning:** Test code files, like `test_tipc/web/index.html`, often lack accessibility features like `alt` tags and semantic HTML structuring (e.g., `<main>`). Even though these files are meant for internal testing, they set a precedent and are sometimes copied by other developers. Incomplete semantics and missing ARIA/alt labels can implicitly teach bad practices.
+**Action:** When adding or updating test cases, particularly those that involve UI components, ensure that basic accessibility standards (like meaningful `alt` text on images and correct semantic elements) are applied. This improves the overall quality of the codebase and ensures robust examples for other developers.
