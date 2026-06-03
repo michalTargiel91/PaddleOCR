@@ -129,18 +129,49 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Pre-compute Polygons, their buffered versions, and areas in O(N)
+    # This avoids redundant O(N^2) instantiations inside the NMS loop
+    buffered_poly_list = []
+    area_list = []
+    for poly_data in polygons:
+        poly = points2polygon(poly_data[:-1])
+        buffered_poly_list.append(poly.buffer(0.0001))
+        # Keep original logic which uses unbuffered area for union calculation
+        area_list.append(poly.area)
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        last_idx = index[-1]
+        keep_poly.append(polygons[last_idx].tolist())
         index = np.delete(index, -1)
-        iou_list = np.zeros((len(index),))
+
+        if len(index) == 0:
+            break
+
+        polyA_buffered = buffered_poly_list[last_idx]
+        areaA = area_list[last_idx]
+
+        iou_list = np.zeros(len(index))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
-        remove_index = np.where(iou_list > threshold)
+            idx_B = index[i]
+            polyB_buffered = buffered_poly_list[idx_B]
+            areaB = area_list[idx_B]
+
+            # Intersection on pre-buffered polygons
+            poly_inter = polyA_buffered & polyB_buffered
+            area_inters = poly_inter.area
+
+            # Union using original areas (as in original code)
+            area_union = areaA + areaB - area_inters
+
+            if area_union == 0:
+                iou_list[i] = 0.0
+            else:
+                iou_list[i] = area_inters / area_union
+
+        remove_index = np.where(iou_list > threshold)[0]
         index = np.delete(index, remove_index)
 
     return keep_poly
