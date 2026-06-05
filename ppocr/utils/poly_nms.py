@@ -132,14 +132,46 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Precompute base polygons, unbuffered areas, and buffered shapes to avoid O(N^2) redundant Shapely instantiation
+    buffer_val = 0.0001
+    poly_areas = []
+    poly_buffers = []
+    for i in range(polygons.shape[0]):
+        # Extract points and convert to Shapely Polygon
+        pts = polygons[i][:-1].reshape([-1, 2])
+        poly = Polygon(pts)
+        poly_areas.append(poly.area)
+        # Buffer to handle self-intersections or precision issues
+        poly_buffers.append(poly.buffer(buffer_val) if buffer_val != 0 else poly)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+
+        A_idx = index[-1]
+        A_buffer = poly_buffers[A_idx]
+        A_area = poly_areas[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_buffer = poly_buffers[B_idx]
+            B_area = poly_areas[B_idx]
+
+            # Wrap intersection in try-except to handle TopologicalError from older Shapely versions
+            try:
+                poly_inter = A_buffer & B_buffer
+                area_inters = poly_inter.area
+                # poly_union equivalent logic: Area(A) + Area(B) - Area(Intersection)
+                # Note: Uses unbuffered areas to match original mathematical logic while intersecting buffered shapes
+                area_union = A_area + B_area - area_inters
+                if area_union == 0:
+                    iou_list[i] = 0.0
+                else:
+                    iou_list[i] = area_inters / area_union
+            except Exception:
+                iou_list[i] = 0.0
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
