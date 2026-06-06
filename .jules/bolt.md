@@ -1,0 +1,3 @@
+## 2025-02-14 - Pre-compute Shapely objects in O(N) to optimize O(N^2) operations
+**Learning:** Pre-computing Polygon objects and their buffered forms in O(N) significantly speeds up O(N^2) operations like Non-Maximum Suppression loops, avoiding redundant object instantiations and geometric buffering operations. Mixed unbuffered area and buffered intersection logic must be preserved for exact mathematical parity with the original PaddleOCR implementation. Also, try-except is required for backward compatibility with older Shapely versions to handle TopologicalErrors gracefully.
+**Action:** Always pre-compute heavy geometric operations linearly before nested loops.
