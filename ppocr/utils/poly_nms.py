@@ -132,14 +132,48 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Pre-compute polygons, their buffered versions, and areas
+    # to avoid redundant O(N^2) computations in the NMS loop
+    buffered_polys = []
+    areas = []
+    for i in range(polygons.shape[0]):
+        try:
+            poly = points2polygon(polygons[i][:-1])
+            buffered_polys.append(poly.buffer(0.0001))
+            areas.append(poly.area)
+        except Exception:
+            buffered_polys.append(None)
+            areas.append(None)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A_buffered = buffered_polys[A_idx]
+        A_area = areas[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_buffered = buffered_polys[B_idx]
+            B_area = areas[B_idx]
+
+            if A_buffered is None or B_buffered is None:
+                iou = 0.0
+            else:
+                try:
+                    poly_inter = A_buffered & B_buffered
+                    area_inters = poly_inter.area
+                    area_union = A_area + B_area - area_inters
+                    if area_union == 0:
+                        iou = 0.0
+                    else:
+                        iou = area_inters / area_union
+                except Exception:
+                    iou = 0.0
+
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
