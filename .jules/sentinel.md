@@ -1,0 +1,4 @@
+## 2024-06-07 - Insecure YAML Deserialization in Config Parsing
+**Vulnerability:** Found multiple instances of `yaml.load(..., Loader=yaml.Loader)` across the codebase (e.g., `tools/program.py`, `benchmark/PaddleOCR_DBNet/utils/util.py`), which is vulnerable to Arbitrary Code Execution (ACE) via insecure deserialization.
+**Learning:** The codebase relies heavily on dynamically parsing string configurations (often from command line or YAML files) using Python's `yaml` library, but used `yaml.Loader` instead of `yaml.SafeLoader`, leaving the parsers exposed to malicious payloads.
+**Prevention:** Always use `yaml.safe_load(...)` or `yaml.load(..., Loader=yaml.SafeLoader)` when parsing YAML configurations. Never use `yaml.Loader` or `yaml.UnsafeLoader` unless specifically required and the input is highly trusted and validated.
