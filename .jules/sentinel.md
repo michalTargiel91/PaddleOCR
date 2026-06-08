@@ -1,0 +1,4 @@
+## 2024-06-08 - Fix Insecure YAML Deserialization
+**Vulnerability:** The codebase was using `yaml.load(..., Loader=yaml.Loader)` when parsing various configuration files, such as in `test_tipc/supplementary/config.py`, `configs/rec/multi_language/generate_multi_language_configs.py`, `benchmark/PaddleOCR_DBNet/utils/util.py`, and `tools/program.py`.
+**Learning:** `yaml.Loader` allows for the execution of arbitrary code through the instantiation of arbitrary Python objects during YAML deserialization. In a system like an OCR training framework, malicious datasets or configuration files provided by a user could leverage this to execute commands on the host machine.
+**Prevention:** Always use `yaml.safe_load(...)` or explicitly pass `Loader=yaml.SafeLoader` to `yaml.load` when parsing YAML configurations. Never trust external input files implicitly.
