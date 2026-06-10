@@ -132,14 +132,57 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Precompute polygons, buffered polygons, and areas in O(N)
+    # to avoid redundant calculations inside the O(N^2) loop
+    precomputed_polys = []
+    for i in range(polygons.shape[0]):
+        poly_obj = None
+        buffered_poly = None
+        area = 0.0
+        try:
+            poly_obj = points2polygon(polygons[i][:-1])
+            area = poly_obj.area
+            buffered_poly = poly_obj.buffer(0.0001)
+        except Exception:
+            pass
+
+        precomputed_polys.append(
+            {"poly": poly_obj, "buffered": buffered_poly, "area": area}
+        )
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A_data = precomputed_polys[A_idx]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
+        if A_data["poly"] is None:
+            continue
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_data = precomputed_polys[B_idx]
+
+            if B_data["poly"] is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                # Intersection area from buffered
+                poly_inter = A_data["buffered"] & B_data["buffered"]
+                area_inters = poly_inter.area
+
+                # Union from unbuffered areas - buffered intersection
+                area_union = A_data["area"] + B_data["area"] - area_inters
+
+                if area_union == 0:
+                    iou_list[i] = 0.0
+                else:
+                    iou_list[i] = area_inters / area_union
+            except Exception:
+                iou_list[i] = 0.0
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
