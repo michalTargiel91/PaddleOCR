@@ -1,0 +1,3 @@
+## 2024-05-24 - Pre-computing Geometry Objects in NMS
+ **Learning:** When calculating NMS over Shapely polygons (like `poly_nms`), re-creating Polygon objects and re-computing their buffered forms inside the nested O(N^2) loop causes massive redundant computation. Moreover, the original code redundantly calculates intersection twice per IOU.
+ **Action:** Pre-compute the Polygon objects, their unbuffered areas, and their buffered representations in an O(N) pass prior to the O(N^2) pairwise comparisons. Wrap the pre-computation in a `try...except Exception` block to catch ToplogicalErrors from degenerate polygons, and handle the pre-computed elements efficiently in the inner loop.
