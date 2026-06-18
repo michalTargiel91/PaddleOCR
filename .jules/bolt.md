@@ -1,0 +1,3 @@
+## 2024-05-24 - Pre-computing Shapely geometries to avoid O(N^2) allocations
+**Learning:** Pre-computing Polygon objects and their buffered forms in O(N) rather than redundantly inside O(N^2) operations (like NMS) significantly improves performance. It's crucial to wrap the pre-computation itself in a `try...except Exception` block to catch errors from degenerate polygons, storing `None` and handling it safely during downstream IOU comparisons.
+**Action:** When dealing with Python arrays and Shapely geometries in quadratic loops, pre-compute geometric objects and derived shapes upfront, carefully falling back to safe defaults for invalid geometries.
