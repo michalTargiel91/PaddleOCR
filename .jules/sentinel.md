@@ -1,0 +1,4 @@
+## 2024-05-15 - Insecure YAML Deserialization in Config Parsers
+**Vulnerability:** Found multiple instances using `yaml.load(..., Loader=yaml.Loader)` instead of `yaml.SafeLoader` across `tools/program.py`, `test_tipc/supplementary/config.py`, `configs/rec/multi_language/generate_multi_language_configs.py`, and `benchmark/PaddleOCR_DBNet/utils/util.py`. Using the default or Unsafe Loader allows execution of arbitrary Python code embedded within YAML files, leading to Remote Code Execution (RCE) if an attacker provides a malicious configuration file.
+**Learning:** `yaml.Loader` is insecure and handles arbitrary objects. The codebase was parsing potentially external config strings and files using this loader.
+**Prevention:** Always use `yaml.safe_load()` or `yaml.load(..., Loader=yaml.SafeLoader)` for any YAML parsing. Avoid `yaml.Loader` or `yaml.UnsafeLoader`.
