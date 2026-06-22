@@ -1,0 +1,3 @@
+## 2024-05-30 - O(N^2) Shapely Polygon Instantiation in NMS
+**Learning:** PaddleOCR's `poly_nms` constructs Shapely `Polygon` objects from raw point arrays repeatedly within its N^2 comparison loop via `boundary_iou` -> `points2polygon`, and then performs redundant `.buffer(0.0001)` calls. Shapely geometries are computationally expensive to construct and buffer.
+**Action:** When dealing with Python arrays and Shapely geometries in O(N^2) operations like NMS, pre-compute `Polygon` objects and their buffered forms in O(N). Crucially, wrap the pre-computation itself in a `try...except Exception` block to catch errors from degenerate polygons, storing `None` and handling it safely during downstream IOU comparisons.
