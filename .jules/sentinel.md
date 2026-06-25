@@ -1,0 +1,4 @@
+## 2025-05-18 - Insecure YAML Deserialization in Config Parsing
+**Vulnerability:** Use of `yaml.load(..., Loader=yaml.Loader)` was found across multiple configuration parsing utilities (e.g., `tools/program.py`, `test_tipc/supplementary/config.py`). This allows arbitrary code execution via unsafe object instantiation if a user provides a malicious YAML file.
+**Learning:** Configurations are routinely parsed via CLI arguments (`--opt` or `-o`) and custom config files. Relying on `yaml.Loader` instead of `yaml.SafeLoader` exposes the application to Remote Code Execution (RCE) when handling untrusted inputs or dynamically evaluating config strings.
+**Prevention:** Always use `yaml.safe_load()` or explicitly pass `Loader=yaml.SafeLoader` to `yaml.load()` when parsing YAML from untrusted sources or config files.
