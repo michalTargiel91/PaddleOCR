@@ -1,0 +1,3 @@
+## 2024-05-18 - PaddleOCR poly_nms optimization
+**Learning:** The `poly_nms` function in `ppocr/utils/poly_nms.py` has a severe O(N^2) performance bottleneck because it repeatedly converts points to `Polygon` objects, computes their areas, and buffers them during IoU calculations inside the inner loop. Also, Shapely geometric operations can throw `TopologicalError` which should be caught.
+**Action:** Pre-compute the `Polygon` objects, their unbuffered areas, and their buffered representations in an initial O(N) pass. Inline the geometric operations within `poly_nms` to avoid redundant O(N^2) processing, wrapping it in a `try...except Exception` block to catch degenerate polygons safely while retaining the unbuffered area logic for exact mathematical compatibility.
