@@ -1,0 +1,3 @@
+## 2025-05-18 - Optimizing poly_nms in PaddleOCR
+**Learning:** In `ppocr/utils/poly_nms.py`, the `poly_nms` function computes IoU for Shapely Polygons redundantly in an O(N^2) loop. Recreating Polygons and recalculating areas via `boundary_iou` for each comparison causes significant overhead.
+**Action:** Pre-compute `Polygon` objects, unbuffered areas, and buffered forms in an initial O(N) pass, wrapping them in a `try...except Exception` block to safely handle degenerate polygons. Inline the intersection and union logic directly within the `poly_nms` loop using the pre-computed buffered polygons for intersection and the unbuffered area for union, effectively matching original logic while vastly reducing function call and instantiation overhead.
