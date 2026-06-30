@@ -128,18 +128,57 @@ def poly_nms(polygons, threshold):
     assert isinstance(polygons, list)
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
+    num_polygons = polygons.shape[0]
+
+    buffered_polys = []
+    poly_areas = []
+
+    for i in range(num_polygons):
+        pts = polygons[i][:-1]
+        try:
+            poly = points2polygon(pts)
+            buf_poly = poly.buffer(0.0001)
+            area = poly.area
+        except Exception:
+            buf_poly = None
+            area = 0.0
+        buffered_polys.append(buf_poly)
+        poly_areas.append(area)
 
     keep_poly = []
-    index = [i for i in range(polygons.shape[0])]
+    index = [i for i in range(num_polygons)]
 
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        keep_index = index[-1]
+        keep_poly.append(polygons[keep_index].tolist())
+
+        buf_A = buffered_polys[keep_index]
+        area_A = poly_areas[keep_index]
+
         index = np.delete(index, -1)
+        if len(index) == 0:
+            break
+
         iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+
+        if buf_A is not None:
+            for i in range(len(index)):
+                idx_B = index[i]
+                buf_B = buffered_polys[idx_B]
+                area_B = poly_areas[idx_B]
+
+                if buf_B is None:
+                    continue
+
+                try:
+                    inter = buf_A & buf_B
+                    area_inters = inter.area
+                    area_union = area_A + area_B - area_inters
+                    if area_union > 0:
+                        iou_list[i] = area_inters / area_union
+                except Exception:
+                    pass
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
