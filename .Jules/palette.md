@@ -1,0 +1,3 @@
+## 2024-05-24 - Accessibility standards in test files
+**Learning:** Test files (e.g. index.html used in E2E tests) also require standard accessibility attributes (like `alt` text on images). This is important because test environments act as code examples and are frequently copy-pasted or referenced by other developers as a template, propagating poor UX and missing accessibility if not fixed here.
+**Action:** Always maintain semantic HTML and basic accessibility standards (like `alt` text and ARIA labels) even in pure test files, treating them with the same UX standard as production template files.
