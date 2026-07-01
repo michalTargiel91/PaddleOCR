@@ -1,0 +1,3 @@
+## 2024-05-18 - Pre-compute Polygons in NMS for PaddleOCR
+**Learning:** In PaddleOCR's `poly_nms`, `points2polygon` and `.buffer()` are repeatedly called inside the nested $O(N^2)$ NMS hot loop (`boundary_iou` -> `poly_iou` -> `poly_intersection`), causing redundant heavy geometry object creation.
+**Action:** Pre-compute `Polygon` objects, buffered forms, and unbuffered area in a single $O(N)$ pass upfront. Use `poly.area` alongside the buffered intersection for the union to perfectly match the original `poly_union` behavior and avoid result mismatches. Wrap pre-computation in a `try...except` to gracefully handle degenerate polygons, avoiding `TopologicalError` and speeding up execution significantly.

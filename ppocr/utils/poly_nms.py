@@ -129,17 +129,48 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Pre-compute polygons and their buffered forms in O(N)
+    poly_list = []
+    for i in range(polygons.shape[0]):
+        try:
+            poly = points2polygon(polygons[i][:-1])
+            buffered_poly = poly.buffer(0.0001)
+            area = poly.area
+            poly_list.append((poly, buffered_poly, area))
+        except Exception:
+            poly_list.append((None, None, 0.0))
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        poly_a, buffered_a, area_a = poly_list[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+
+        if poly_a is not None:
+            for i in range(len(index)):
+                B_idx = index[i]
+                poly_b, buffered_b, area_b = poly_list[B_idx]
+                if poly_b is None:
+                    iou_list[i] = 0.0
+                    continue
+
+                try:
+                    # Inline intersection and union logic
+                    poly_inter = buffered_a & buffered_b
+                    area_inters = poly_inter.area
+                    area_union = area_a + area_b - area_inters
+                    if area_union == 0:
+                        iou_list[i] = 0.0
+                    else:
+                        iou_list[i] = area_inters / area_union
+                except Exception:
+                    iou_list[i] = 0.0
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
