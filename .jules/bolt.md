@@ -1,0 +1,3 @@
+## 2024-05-14 - Pre-compute Shapely geometries in poly_nms
+**Learning:** In PaddleOCR's `poly_nms`, creating Shapely polygons and buffers repeatedly within the O(N^2) IoU calculation loop caused a massive performance bottleneck. The original implementation called `points2polygon` and `poly.buffer(0.0001)` inside `boundary_iou` for every comparison pair, leading to redundant calculations.
+**Action:** Pre-compute the `Polygon` objects, their buffered forms, and their unbuffered areas in O(N) time before entering the NMS comparison loop. Inline the intersection area calculation directly in the hot loop to avoid function call overhead. Wrap pre-computation and intersection in `try...except` to safely handle degenerate polygons.
