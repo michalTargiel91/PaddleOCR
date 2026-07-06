@@ -129,17 +129,58 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Pre-compute polygons, buffered polygons, and unbuffered areas
+    poly_objects = []
+    for poly_pts in polygons:
+        try:
+            pts = poly_pts[:-1].tolist()
+            if not valid_boundary(pts, False):
+                poly_objects.append(None)
+                continue
+            poly = points2polygon(pts)
+            buf_poly = poly.buffer(0.0001)
+            area = poly.area
+            poly_objects.append((poly, buf_poly, area))
+        except Exception:
+            poly_objects.append(None)
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        curr_idx = index[-1]
+        keep_poly.append(polygons[curr_idx].tolist())
+        A = polygons[curr_idx][:-1].tolist()
+        A_obj = poly_objects[curr_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B = polygons[B_idx][:-1].tolist()
+            B_obj = poly_objects[B_idx]
+
+            if A_obj is None or B_obj is None:
+                # Fallback to original boundary_iou which includes all assertions and edge cases
+                iou_list[i] = boundary_iou(A, B)
+                continue
+
+            A_poly, A_buf, A_area = A_obj
+            B_poly, B_buf, B_area = B_obj
+
+            try:
+                inter = A_buf & B_buf
+                area_inters = inter.area
+                area_union = A_area + B_area - area_inters
+
+                if area_union <= 0:
+                    iou_list[i] = boundary_iou(A, B)
+                else:
+                    iou_list[i] = area_inters / area_union
+            except Exception:
+                iou_list[i] = boundary_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
