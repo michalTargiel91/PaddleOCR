@@ -1,0 +1,3 @@
+## 2024-05-18 - Optimize Shapely geometry pre-computation in poly_nms
+**Learning:** In heavily nested operations like Non-Maximum Suppression (NMS) over Shapely polygons, redundant object instantiation and buffering inside the inner loops creates immense overhead (O(N^2)). Using `poly.buffer()` inside intersection calculations adds massive delay.
+**Action:** When dealing with Shapely geometries in O(N^2) algorithms, always pre-compute standard Polygon objects, their buffered forms, and their base areas in a single O(N) pass. Wrap this pre-computation in `try...except` to safely capture degenerate polygons as `None`, allowing safe handling downstream without blowing up the NMS pipeline.
