@@ -130,17 +130,68 @@ def poly_nms(polygons, threshold):
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
     keep_poly = []
-    index = [i for i in range(polygons.shape[0])]
+    index = list(range(polygons.shape[0]))
+
+    # Precompute polygons and their unbuffered areas, buffered geometries
+    # to avoid redundant O(N^2) Shapely creations and intersections.
+    poly_cache = {}
+    for i in range(polygons.shape[0]):
+        pts = polygons[i][:-1]
+        try:
+            poly = points2polygon(pts)
+            poly_area = poly.area
+            poly_buf = poly.buffer(0.0001)
+            poly_cache[i] = (poly, poly_area, poly_buf)
+        except Exception:
+            poly_cache[i] = None
 
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
-        index = np.delete(index, -1)
-        iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
-        remove_index = np.where(iou_list > threshold)
-        index = np.delete(index, remove_index)
+        curr_idx = index[-1]
+        keep_poly.append(polygons[curr_idx].tolist())
+        index.pop()
+
+        curr_cache = poly_cache[curr_idx]
+
+        remove_indices = []
+        for i_idx, i in enumerate(index):
+            B_cache = poly_cache[i]
+            iou = 0.0
+
+            if curr_cache is None or B_cache is None:
+                # Fallback to original
+                A = polygons[curr_idx][:-1]
+                B = polygons[i][:-1]
+                iou = boundary_iou(A, B)
+            else:
+                poly_A, area_A, buf_A = curr_cache
+                poly_B, area_B, buf_B = B_cache
+
+                # Inline intersection and union calculation using unbuffered areas
+                try:
+                    inter_geom = buf_A & buf_B
+                    area_inters = inter_geom.area
+
+                    # Original logic uses unbuffered areas for the union
+                    area_union = area_A + area_B - area_inters
+
+                    if area_union <= 0:
+                        # Revert to exact fallback if math edge case hits
+                        A = polygons[curr_idx][:-1]
+                        B = polygons[i][:-1]
+                        iou = boundary_iou(A, B)
+                    else:
+                        iou = area_inters / area_union
+                except Exception:
+                    # Fallback just in case
+                    A = polygons[curr_idx][:-1]
+                    B = polygons[i][:-1]
+                    iou = boundary_iou(A, B)
+
+            if iou > threshold:
+                remove_indices.append(i_idx)
+
+        # Remove from index in reverse order to not mess up indices
+        for idx in reversed(remove_indices):
+            index.pop(idx)
 
     return keep_poly
