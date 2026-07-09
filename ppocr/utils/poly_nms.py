@@ -129,17 +129,50 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Precompute Shapely polygons, buffered polygons, and areas
+    # points2polygon is defined in this file (line 19)
+    poly_objects = []
+    for p in polygons:
+        points = p[:-1]
+        try:
+            poly = points2polygon(points)
+            area = poly.area
+            poly_buf = poly.buffer(0.0001)
+            poly_objects.append((poly, poly_buf, area))
+        except Exception:
+            poly_objects.append(None)
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
         A = polygons[index[-1]][:-1]
+        A_obj = poly_objects[index[-1]]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
             B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_obj = poly_objects[index[i]]
+
+            if A_obj is not None and B_obj is not None:
+                poly_A, poly_buf_A, area_A = A_obj
+                poly_B, poly_buf_B, area_B = B_obj
+
+                # We calculate intersection area using buffered polygons and union using unbuffered areas
+                # to perfectly match the mathematical logic in the original poly_union.
+                poly_inter = poly_buf_A & poly_buf_B
+                area_inters = poly_inter.area
+                area_union = area_A + area_B - area_inters
+
+                # Gracefully revert to exact fallback to prevent NMS from failing to suppress duplicates
+                if area_union > 0:
+                    iou_list[i] = area_inters / area_union
+                else:
+                    iou_list[i] = boundary_iou(A, B)
+            else:
+                iou_list[i] = boundary_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
