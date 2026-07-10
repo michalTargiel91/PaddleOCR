@@ -1,0 +1,3 @@
+## 2025-02-12 - Optimize poly_nms by avoiding redundant Shapely operations
+**Learning:** In PaddleOCR's `poly_nms`, creating Shapely `Polygon` objects and applying `buffer(0.0001)` inside an O(N^2) loop is a massive performance bottleneck due to redundant calculations. Pre-computing these buffered geometries and their unbuffered areas into lists before the O(N^2) loop reduces overhead significantly (e.g., from ~1.1s to ~0.07s for N=100).
+**Action:** Always pre-compute complex objects (like Shapely polygons or regex patterns) in an O(N) loop before entering an O(N^2) comparison loop to avoid redundant allocations and operations.

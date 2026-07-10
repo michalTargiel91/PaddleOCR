@@ -132,14 +132,72 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # ⚡ Bolt: Pre-compute valid polygons, buffered polygons, and buffered areas
+    # This avoids redundant geometric operations in the O(N^2) inner loop.
+    poly_objs = []
+    buf_objs = []
+    poly_areas = []
+    for i in range(polygons.shape[0]):
+        pts = polygons[i][:-1]
+        try:
+            if not valid_boundary(pts, False):
+                poly_objs.append(None)
+                buf_objs.append(None)
+                poly_areas.append(0.0)
+                continue
+
+            p = points2polygon(pts)
+            poly_objs.append(p)
+            buf_p = p.buffer(0.0001)
+            buf_objs.append(buf_p)
+            poly_areas.append(buf_p.area)
+        except Exception:
+            poly_objs.append(None)
+            buf_objs.append(None)
+            poly_areas.append(0.0)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+
+        idx_A = index[-1]
+        A_pts = polygons[idx_A][:-1]
+        poly_A = poly_objs[idx_A]
+        buf_A = buf_objs[idx_A]
+        area_A = poly_areas[idx_A]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            idx_B = index[i]
+            poly_B = poly_objs[idx_B]
+            buf_B = buf_objs[idx_B]
+
+            # ⚡ Bolt: Fallback to original if geometries are invalid
+            if poly_A is None or poly_B is None or buf_A is None or buf_B is None:
+                B_pts = polygons[idx_B][:-1]
+                iou_list[i] = boundary_iou(A_pts, B_pts)
+                continue
+
+            area_B = poly_areas[idx_B]
+
+            # ⚡ Bolt: Inline intersection and union logic with exception handling
+            try:
+                poly_inter = buf_A.intersection(buf_B)
+                area_inters = poly_inter.area
+                area_union = area_A + area_B - area_inters
+
+                # ⚡ Bolt: Check for anomalies
+                if area_union <= 0:
+                    B_pts = polygons[idx_B][:-1]
+                    iou_list[i] = boundary_iou(A_pts, B_pts)
+                    continue
+
+                iou_list[i] = area_inters / area_union
+            except Exception:
+                B_pts = polygons[idx_B][:-1]
+                iou_list[i] = boundary_iou(A_pts, B_pts)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
