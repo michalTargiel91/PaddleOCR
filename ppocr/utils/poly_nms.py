@@ -124,6 +124,8 @@ def poly_iou(poly_det, poly_gt):
     return area_inters / area_union
 
 
+import shapely
+
 def poly_nms(polygons, threshold):
     assert isinstance(polygons, list)
 
@@ -132,14 +134,60 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Pre-compute polygons and their buffered versions
+    precomputed_polys = []
+    for i in range(polygons.shape[0]):
+        pts = polygons[i][:-1]
+        try:
+            poly = points2polygon(pts)
+            buf_poly = poly.buffer(0.0001)
+            area = buf_poly.area
+            is_valid = poly.is_valid and buf_poly.is_valid
+            precomputed_polys.append((poly, buf_poly, area, is_valid))
+        except Exception:
+            precomputed_polys.append(None)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A = polygons[A_idx][:-1]
+        A_pre = precomputed_polys[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B = polygons[B_idx][:-1]
+            B_pre = precomputed_polys[B_idx]
+
+            iou = 0.0
+            fallback = False
+
+            # Fast path
+            if A_pre is not None and B_pre is not None and A_pre[3] and B_pre[3]:
+                poly_A, buf_A, area_A, _ = A_pre
+                poly_B, buf_B, area_B, _ = B_pre
+
+                try:
+                    poly_inter = buf_A.intersection(buf_B)
+                    area_inters = poly_inter.area
+                    area_union = area_A + area_B - area_inters
+
+                    if area_union <= 0:
+                        fallback = True
+                    else:
+                        iou = area_inters / area_union
+                except shapely.errors.TopologicalError:
+                    fallback = True
+            else:
+                fallback = True
+
+            if fallback:
+                iou = boundary_iou(A, B)
+
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
