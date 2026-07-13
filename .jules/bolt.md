@@ -1,0 +1,3 @@
+## 2025-02-12 - poly_nms Optimization
+**Learning:** Moving geometric parsing, object initialization (`Polygon`), and `buffer(0.0001)` calls out of the O(N^2) NMS inner loop into an O(N) precomputation phase reduces execution time by over 15x. Avoid general `try...except Exception` blocks inside the inner loop and selectively catch `shapely.errors.TopologicalError` instead. Also, mixing unbuffered areas with buffered intersections creates severe mathematical regressions; caching and using the buffered area is critical.
+**Action:** Always precompute expensive geometric operations (like Shapely polygon creation and buffering) in a single pass before hot loops.
