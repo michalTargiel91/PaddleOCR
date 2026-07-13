@@ -124,6 +124,8 @@ def poly_iou(poly_det, poly_gt):
     return area_inters / area_union
 
 
+import shapely.errors
+
 def poly_nms(polygons, threshold):
     assert isinstance(polygons, list)
 
@@ -132,14 +134,51 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    precomputed = []
+    for poly_data in polygons:
+        pts = poly_data[:-1]
+        try:
+            poly = points2polygon(pts)
+            buf_poly = poly.buffer(0.0001)
+            area = buf_poly.area
+            valid = area > 0 and buf_poly.is_valid
+        except Exception:
+            buf_poly = None
+            area = 0.0
+            valid = False
+        precomputed.append({
+            'valid': valid,
+            'buf_poly': buf_poly,
+            'area': area,
+            'pts': pts
+        })
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A_pre = precomputed[A_idx]
+        A = A_pre['pts']
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_pre = precomputed[B_idx]
+            B = B_pre['pts']
+
+            if A_pre['valid'] and B_pre['valid']:
+                try:
+                    inter = A_pre['buf_poly'].intersection(B_pre['buf_poly'])
+                    inter_area = inter.area
+                    union_area = A_pre['area'] + B_pre['area'] - inter_area
+                    if union_area > 0:
+                        iou_list[i] = inter_area / union_area
+                    else:
+                        iou_list[i] = boundary_iou(A, B)
+                except shapely.errors.TopologicalError:
+                    iou_list[i] = boundary_iou(A, B)
+            else:
+                iou_list[i] = boundary_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
