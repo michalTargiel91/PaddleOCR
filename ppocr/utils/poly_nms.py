@@ -124,6 +124,8 @@ def poly_iou(poly_det, poly_gt):
     return area_inters / area_union
 
 
+import shapely.errors
+
 def poly_nms(polygons, threshold):
     assert isinstance(polygons, list)
 
@@ -132,14 +134,50 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    precomputed = []
+    for i in range(polygons.shape[0]):
+        try:
+            poly = points2polygon(polygons[i][:-1])
+            buf_poly = poly.buffer(0.0001)
+            area = buf_poly.area
+            if not buf_poly.is_valid or area <= 0:
+                precomputed.append(None)
+            else:
+                precomputed.append((buf_poly, area))
+        except Exception:
+            precomputed.append(None)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
         A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
+        pre_A = precomputed[A_idx]
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B = polygons[B_idx][:-1]
+            pre_B = precomputed[B_idx]
+
+            if pre_A is not None and pre_B is not None:
+                try:
+                    buf_A, area_A = pre_A
+                    buf_B, area_B = pre_B
+
+                    inter = buf_A.intersection(buf_B)
+                    area_inters = inter.area
+                    area_union = area_A + area_B - area_inters
+
+                    if area_union <= 0:
+                        iou_list[i] = boundary_iou(A, B)
+                    else:
+                        iou_list[i] = area_inters / area_union
+                except shapely.errors.TopologicalError:
+                    iou_list[i] = boundary_iou(A, B)
+            else:
+                iou_list[i] = boundary_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
