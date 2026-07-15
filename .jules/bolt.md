@@ -1,0 +1,3 @@
+## 2024-05-24 - Precomputing buffered polygons in poly_nms
+**Learning:** In PaddleOCR's poly_nms, repeatedly calling `poly.buffer(0.0001)` inside an O(N^2) IoU loop caused a severe performance bottleneck. Pre-computing buffered polygons provides massive speedups, but using unbuffered areas with buffered intersections creates mathematical regressions (negative areas).
+**Action:** Always cache and use the *buffered* polygon's area (`buf_poly.area`) for union calculations to match intersection dimensions, and gracefully fall back to original helper functions for geometric anomalies or `shapely.errors.TopologicalError` to ensure robustness.
