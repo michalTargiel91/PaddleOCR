@@ -1,0 +1,3 @@
+## 2024-05-23 - Fast Poly NMS Optimization
+**Learning:** Optimizing `poly_nms` from O(N^2) polygon instantiations to O(N) pre-computation caching `poly.buffer(0.0001)` yields a ~6.8x speedup. However, mixing unbuffered areas (`poly.area`) with buffered intersections in the IoU calculations introduces severe mathematical regressions (e.g., negative union areas).
+**Action:** When implementing fast-path O(N) polygon pre-computations, ensure strict mathematical consistency by using the buffered polygon's area (`buf_poly.area`) for union calculations, and explicitly catch `shapely.errors.TopologicalError` to revert to original unoptimized helper logic for degenerate shapes.
