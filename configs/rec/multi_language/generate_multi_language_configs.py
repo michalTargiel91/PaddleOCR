@@ -130,9 +130,7 @@ assert os.path.isfile(
 You can download it from \
 https://github.com/PaddlePaddle/PaddleOCR/tree/dygraph/configs/rec/multi_language/"
 
-global_config = yaml.load(
-    open("./rec_multi_language_lite_train.yml", "rb"), Loader=yaml.Loader
-)
+global_config = yaml.safe_load(open("./rec_multi_language_lite_train.yml", "rb"))
 project_path = os.path.abspath(os.path.join(os.getcwd(), "../../../"))
 
 
@@ -180,7 +178,7 @@ class ArgsParser(ArgumentParser):
         for s in opts:
             s = s.strip()
             k, v = s.split("=")
-            config[k] = yaml.load(v, Loader=yaml.Loader)
+            config[k] = yaml.safe_load(v)
         return config
 
     def _set_language(self, type):

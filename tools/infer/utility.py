@@ -527,7 +527,7 @@ def load_config(file_path):
     if ext not in [".yml", ".yaml"]:
         raise ValueError(f"only support yaml files for now, got {file_path}")
     with open(file_path, "rb") as file:
-        config = yaml.load(file, Loader=yaml.SafeLoader)
+        config = yaml.safe_load(file)
     return config
 
 
