@@ -1,0 +1,3 @@
+## 2025-03-09 - Pre-computing Geometry in O(N^2) NMS loops
+**Learning:** Optimizing PaddleOCR's `poly_nms` with Shapely requires pre-computing buffered polygons in O(N) before the inner O(N^2) IoU calculation loop, which yields ~10x speedup. Mixing unbuffered areas with buffered intersections causes a severe mathematical regression, so we must cache and use the *buffered* polygon's area (`buf_poly.area`). Also, we must explicitly catch `shapely.errors.TopologicalError` to fallback properly for irregular OCR polygons.
+**Action:** When optimizing NMS loops, hoist expensive geometry processing (buffering, checking validity, computing area) outside the O(N^2) loop, and use `.intersection()` directly instead of the `&` operator for broader Shapely compatibility.

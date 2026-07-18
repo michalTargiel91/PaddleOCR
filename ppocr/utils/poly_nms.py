@@ -14,6 +14,7 @@
 
 import numpy as np
 from shapely.geometry import Polygon
+import shapely.errors
 
 
 def points2polygon(points):
@@ -132,14 +133,56 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Pre-compute buffered polygons and their areas
+    buffer = 0.0001
+    precomputed = []
+    for i in range(polygons.shape[0]):
+        try:
+            poly = points2polygon(polygons[i][:-1])
+            if buffer != 0:
+                buf_poly = poly.buffer(buffer)
+            else:
+                buf_poly = poly
+            area = buf_poly.area
+
+            # Basic validation of geometry
+            if area <= 0 or not buf_poly.is_valid:
+                precomputed.append(None)
+            else:
+                precomputed.append((buf_poly, area))
+        except Exception:
+            precomputed.append(None)
+
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        curr_idx = index[-1]
+        keep_poly.append(polygons[curr_idx].tolist())
+        A_pts = polygons[curr_idx][:-1]
+        A_data = precomputed[curr_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            idx_b = index[i]
+            B_pts = polygons[idx_b][:-1]
+            B_data = precomputed[idx_b]
+
+            if A_data is not None and B_data is not None:
+                buf_A, area_A = A_data
+                buf_B, area_B = B_data
+                try:
+                    poly_inter = buf_A.intersection(buf_B)
+                    area_inters = poly_inter.area
+                    area_union = area_A + area_B - area_inters
+                    if area_union > 0:
+                        iou_list[i] = area_inters / area_union
+                    else:
+                        iou_list[i] = boundary_iou(A_pts, B_pts)
+                except shapely.errors.TopologicalError:
+                    iou_list[i] = boundary_iou(A_pts, B_pts)
+            else:
+                iou_list[i] = boundary_iou(A_pts, B_pts)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
