@@ -1,0 +1,3 @@
+## 2024-05-24 - Precomputing buffered polygons for Shapely geometry operations
+**Learning:** In O(N^2) loops using Shapely, instantiating Polygons and buffering them inside the inner hot loop causes massive performance regressions. However, when optimizing this, mixing unbuffered areas with buffered intersections introduces mathematical regressions.
+**Action:** Precompute buffered polygons (`.buffer(0.0001)`) and their areas (`buf_poly.area`) in an O(N) pre-computation phase, and use these precomputed buffered values in the inner loop to calculate the IoU. Also, explicitly catch `shapely.errors.TopologicalError` to gracefully fall back to default behavior for invalid geometries.
