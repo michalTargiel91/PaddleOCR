@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import shapely.errors
 from shapely.geometry import Polygon
 
 
@@ -132,14 +133,56 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    precomputed = {}
+    for i in range(polygons.shape[0]):
+        pts = polygons[i][:-1]
+        if not valid_boundary(pts, False):
+            precomputed[i] = None
+            continue
+        try:
+            poly = points2polygon(pts)
+            area = poly.area
+            buf_poly = poly.buffer(0.0001)
+            if area <= 0 or not poly.is_valid:
+                precomputed[i] = None
+            else:
+                precomputed[i] = (poly, area, buf_poly)
+        except Exception:
+            precomputed[i] = None
+
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        curr_idx = index[-1]
+        keep_poly.append(polygons[curr_idx].tolist())
+
+        A_pts = polygons[curr_idx][:-1]
+        A_data = precomputed[curr_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_data = precomputed[B_idx]
+
+            if A_data is None or B_data is None:
+                iou_list[i] = boundary_iou(A_pts, polygons[B_idx][:-1])
+                continue
+
+            poly_A, area_A, buf_A = A_data
+            poly_B, area_B, buf_B = B_data
+
+            try:
+                poly_inter = buf_A.intersection(buf_B)
+                area_inters = poly_inter.area
+                area_union = area_A + area_B - area_inters
+
+                if area_union == 0:
+                    iou_list[i] = 0.0
+                else:
+                    iou_list[i] = area_inters / area_union
+            except shapely.errors.TopologicalError:
+                iou_list[i] = boundary_iou(A_pts, polygons[B_idx][:-1])
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
