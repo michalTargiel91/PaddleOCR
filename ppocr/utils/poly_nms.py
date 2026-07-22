@@ -126,21 +126,63 @@ def poly_iou(poly_det, poly_gt):
 
 def poly_nms(polygons, threshold):
     assert isinstance(polygons, list)
+    if len(polygons) == 0:
+        return []
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    precomputed = []
+    for i in range(polygons.shape[0]):
+        pts = polygons[i][:-1]
+        if not valid_boundary(pts, False):
+            precomputed.append(None)
+            continue
+        try:
+            poly = points2polygon(pts)
+            area = poly.area
+            precomputed.append((poly, area))
+        except Exception:
+            precomputed.append(None)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A = polygons[A_idx][:-1]
         index = np.delete(index, -1)
-        iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
-        remove_index = np.where(iou_list > threshold)
+
+        A_pre = precomputed[A_idx]
+        if A_pre is None:
+            iou_list = np.zeros((len(index),))
+            for i in range(len(index)):
+                B = polygons[index[i]][:-1]
+                iou_list[i] = boundary_iou(A, B)
+            remove_index = np.where(iou_list > threshold)
+            index = np.delete(index, remove_index)
+            continue
+
+        poly_A, area_A = A_pre
+
+        remove_index = []
+        for i, idx in enumerate(index):
+            B_pre = precomputed[idx]
+            if B_pre is None or area_A <= 0 or B_pre[1] <= 0:
+                iou = boundary_iou(A, polygons[idx][:-1])
+            else:
+                poly_B, area_B = B_pre
+                try:
+                    poly_inter = poly_A.intersection(poly_B)
+                    area_inters = poly_inter.area
+                    area_union = area_A + area_B - area_inters
+                    iou = area_inters / area_union if area_union > 0 else 0.0
+                except Exception:
+                    iou = boundary_iou(A, polygons[idx][:-1])
+
+            if iou > threshold:
+                remove_index.append(i)
+
         index = np.delete(index, remove_index)
 
     return keep_poly
