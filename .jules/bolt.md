@@ -1,0 +1,3 @@
+## 2024-05-18 - Optimize Shapely polygon intersections in poly_nms
+**Learning:** Buffering polygons (`poly.buffer(0.0001)`) in Shapely adds vertices and makes intersection vastly slower, negating the benefits of precomputing geometries in O(N^2) inner loops (like NMS). Unconditionally buffering objects causes massive overhead (taking 17-18 seconds for 400 polygons).
+**Action:** Do not precompute buffered polygons. Instead, precompute only the base `Polygon` and its area. Intersect the unbuffered polygons in the inner loop (`poly_A.intersection(poly_B)`) and use a `try...except Exception:` block to fall back to the original unoptimized helper function (`boundary_iou`) if an invalid geometry error occurs.
