@@ -132,14 +132,39 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Precompute shapely polygons and areas
+    precomputed_polys = []
+    for i in range(polygons.shape[0]):
+        try:
+            poly = points2polygon(polygons[i][:-1])
+            precomputed_polys.append((poly, poly.area))
+        except Exception:
+            precomputed_polys.append((None, 0.0))
+
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        current_idx = index[-1]
+        keep_poly.append(polygons[current_idx].tolist())
+        A_poly, A_area = precomputed_polys[current_idx]
+
         index = np.delete(index, -1)
+
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_poly, B_area = precomputed_polys[B_idx]
+
+            # Fast intersection
+            if A_poly is not None and B_poly is not None:
+                try:
+                    inter = A_poly.intersection(B_poly).area
+                    union = A_area + B_area - inter
+                    iou_list[i] = inter / union if union > 0 else 0.0
+                except Exception:
+                    # Fallback to original unoptimized logic if Shapely errors on bad geometries
+                    iou_list[i] = boundary_iou(polygons[current_idx][:-1], polygons[B_idx][:-1])
+            else:
+                iou_list[i] = boundary_iou(polygons[current_idx][:-1], polygons[B_idx][:-1])
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
