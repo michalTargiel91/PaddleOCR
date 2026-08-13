@@ -203,7 +203,7 @@ def main(args):
 
         f_html.write("<tr>\n")
         f_html.write(f"<td> {os.path.basename(image_file)} <br/>\n")
-        f_html.write(f'<td><img src="{image_file}" width=640></td>\n')
+        f_html.write(f'<td><img src="{image_file}" width=640 alt="Original image"></td>\n')
         f_html.write(
             '<td><table  border="1">'
             + pred_html.replace("<html><body><table>", "").replace(
@@ -211,7 +211,7 @@ def main(args):
             )
             + "</table></td>\n"
         )
-        f_html.write(f'<td><img src="{os.path.basename(image_file)}" width=640></td>\n')
+        f_html.write(f'<td><img src="{os.path.basename(image_file)}" width=640 alt="Cell box visualization"></td>\n')
         f_html.write("</tr>\n")
     f_html.write("</table>\n")
     f_html.close()
