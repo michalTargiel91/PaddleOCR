@@ -132,14 +132,36 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    poly_cache = []
+    for i in range(polygons.shape[0]):
+        poly = points2polygon(polygons[i][:-1])
+        poly_cache.append((poly, poly.area))
+
     while len(index) > 0:
-        keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        curr_idx = index[-1]
+        keep_poly.append(polygons[curr_idx].tolist())
+        A = polygons[curr_idx][:-1]
+        A_poly, A_area = poly_cache[curr_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B_poly, B_area = poly_cache[B_idx]
+
+            try:
+                area_inters = A_poly.intersection(B_poly).area
+                area_union = A_area + B_area - area_inters
+                if area_union == 0:
+                    iou = 0.0
+                else:
+                    iou = area_inters / area_union
+            except Exception:
+                B = polygons[B_idx][:-1]
+                iou = boundary_iou(A, B)
+
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
