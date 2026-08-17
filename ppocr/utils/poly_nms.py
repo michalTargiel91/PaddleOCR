@@ -132,14 +132,46 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Precompute Shapely polygons and their areas
+    shapely_polys = []
+    for i in range(polygons.shape[0]):
+        try:
+            poly = points2polygon(polygons[i][:-1])
+            if poly is not None:
+                shapely_polys.append((poly, poly.area))
+            else:
+                shapely_polys.append((None, 0.0))
+        except Exception:
+            shapely_polys.append((None, 0.0))
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+
+        idx_A = index[-1]
+        poly_A, area_A = shapely_polys[idx_A]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            idx_B = index[i]
+            poly_B, area_B = shapely_polys[idx_B]
+
+            if poly_A is None or poly_B is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                area_inters = poly_A.intersection(poly_B).area
+                area_union = area_A + area_B - area_inters
+                iou_list[i] = area_inters / area_union if area_union > 0 else 0.0
+            except Exception:
+                # Fallback to the original helper if intersection fails due to topology issues
+                try:
+                    iou_list[i] = boundary_iou(polygons[idx_A][:-1], polygons[idx_B][:-1])
+                except Exception:
+                    iou_list[i] = 0.0
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
