@@ -180,7 +180,7 @@ class ArgsParser(ArgumentParser):
         for s in opts:
             s = s.strip()
             k, v = s.split("=")
-            config[k] = yaml.load(v, Loader=yaml.Loader)
+            config[k] = yaml.load(v, Loader=yaml.SafeLoader)
         return config
 
     def _set_language(self, type):
