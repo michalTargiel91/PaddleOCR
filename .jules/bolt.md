@@ -1,0 +1,3 @@
+## 2024-05-18 - Avoid Pre-buffering Polygons in Shapely Loops
+**Learning:** When optimizing Shapely geometric intersections in inner loops (e.g., `poly_nms`), pre-buffering polygons for intersection drastically reduces performance. Unconditionally buffering polygons (e.g., `poly.buffer(0.0001)`) adds vertices and makes intersection vastly slower, negating caching benefits.
+**Action:** Only precompute the base polygon and its area. Intersect the unbuffered polygons directly via `poly_A.intersection(poly_B)`. If highly irregular OCR polygons cause errors, wrap the call in a `try...except Exception:` block to gracefully fall back to an unoptimized helper function (e.g., `boundary_iou`).

@@ -132,14 +132,44 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Precompute base polygon and its area
+    precomputed = []
+    for poly_data in polygons:
+        points = poly_data[:-1]
+        try:
+            poly = points2polygon(points)
+            precomputed.append((poly, poly.area))
+        except Exception:
+            precomputed.append((None, 0.0))
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A = polygons[A_idx][:-1]
+        poly_A, area_A = precomputed[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B = polygons[B_idx][:-1]
+            poly_B, area_B = precomputed[B_idx]
+
+            if poly_A is not None and poly_B is not None and area_A > 0 and area_B > 0:
+                try:
+                    inter = poly_A.intersection(poly_B)
+                    area_inter = inter.area
+                    area_union = area_A + area_B - area_inter
+                    if area_union > 0:
+                        iou_list[i] = area_inter / area_union
+                    else:
+                        iou_list[i] = 0.0
+                except Exception:
+                    iou_list[i] = boundary_iou(A, B)
+            else:
+                iou_list[i] = boundary_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
