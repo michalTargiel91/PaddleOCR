@@ -1,0 +1,3 @@
+## 2025-02-12 - Optimize poly_nms shapely intersection
+**Learning:** Buffering polygons (`poly.buffer(0.0001)`) in Python's Shapely inside a nested NMS loop drastically slows down performance by repeatedly generating extraneous vertices. Also, constantly converting coordinates to polygons inside O(N^2) loops adds heavy overhead.
+**Action:** Cache the base unbuffered polygon and its area upfront. Perform `.intersection()` on the unbuffered unmutated polygons directly in inner NMS loop, and gracefully fallback in a `try...except` if the bounding boxes trigger topological errors. `points2polygon` is a valid utility within `ppocr.utils.poly_nms`.
