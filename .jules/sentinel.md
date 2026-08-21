@@ -1,0 +1,4 @@
+## 2025-02-14 - Fix Insecure YAML Deserialization in Config Loading
+**Vulnerability:** Found `yaml.load(..., Loader=yaml.Loader)` used in `tools/program.py` for loading configuration files and parsing command-line options (`merge_config`). This allows arbitrary code execution (ACE) if a malicious YAML payload is supplied.
+**Learning:** Config parsers in ML/data science repositories frequently default to `yaml.Loader` for complex object loading, unintentionally exposing the application to severe code execution risks from untrusted input files or CLI arguments.
+**Prevention:** Always use `yaml.safe_load(...)` or `yaml.load(..., Loader=yaml.SafeLoader)` when handling configuration files to restrict parsing to simple Python objects, preventing instantiation of arbitrary classes or execution of malicious payloads.
