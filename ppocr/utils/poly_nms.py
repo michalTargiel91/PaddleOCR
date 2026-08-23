@@ -132,14 +132,45 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # [Bolt Optimization] Precompute and cache Shapely Polygons and their areas
+    # This avoids redundant O(N^2) object instantiations in the inner loop.
+    shapely_polys = []
+    for p in polygons:
+        pts = p[:-1]
+        try:
+            poly = Polygon(np.array(pts).reshape([-1, 2]))
+            shapely_polys.append((poly, poly.area))
+        except Exception:
+            shapely_polys.append((None, 0.0))
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
+        poly_A, area_A = shapely_polys[index[-1]]
         A = polygons[index[-1]][:-1]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            idx_B = index[i]
+            poly_B, area_B = shapely_polys[idx_B]
+
+            # [Bolt Optimization] Fast path: Use native unbuffered intersection
+            if poly_A is not None and poly_B is not None:
+                try:
+                    inter = poly_A.intersection(poly_B).area
+                    union = area_A + area_B - inter
+                    iou = inter / union if union > 0 else 0.0
+                except Exception:
+                    # Fallback to standard boundary_iou on topological errors
+                    B = polygons[idx_B][:-1]
+                    iou = boundary_iou(A, B)
+            else:
+                B = polygons[idx_B][:-1]
+                iou = boundary_iou(A, B)
+
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
