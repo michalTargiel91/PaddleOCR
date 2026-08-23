@@ -1,0 +1,3 @@
+## 2025-02-28 - Optimizing poly_nms in PaddleOCR
+**Learning:** Pre-buffering Shapely polygons inside tight loops like NMS is disastrous for performance. While it might seem intuitive to buffer slightly to avoid precision issues, `poly.buffer(0.0001)` dynamically adds numerous vertices, turning intersection checks from ~0.1s to over 1.7s on 100 polygons.
+**Action:** Use unbuffered intersection (`poly_A.intersection(poly_B)`) in the inner loop, caching the base polygon instantiation upfront. Rely on a `try-except` block to gracefully fallback to manual `boundary_iou` if topologically irregular polygons cause errors during Shapely intersection, instead of aggressively pre-buffering everything.
