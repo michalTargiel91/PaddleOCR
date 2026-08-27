@@ -132,14 +132,43 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    shapely_polys = []
+    for p in polygons:
+        try:
+            poly = Polygon(np.array(p[:-1]).reshape([-1, 2]))
+            if poly is not None:
+                shapely_polys.append((poly, poly.area))
+            else:
+                shapely_polys.append((None, 0.0))
+        except Exception:
+            shapely_polys.append((None, 0.0))
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A = polygons[A_idx][:-1]
+        poly_A, area_A = shapely_polys[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_idx = index[i]
+            B = polygons[B_idx][:-1]
+            poly_B, area_B = shapely_polys[B_idx]
+
+            if poly_A is not None and poly_B is not None:
+                try:
+                    inter_area = poly_A.intersection(poly_B).area
+                    union_area = area_A + area_B - inter_area
+                    if union_area == 0:
+                        iou_list[i] = 0.0
+                    else:
+                        iou_list[i] = inter_area / union_area
+                except Exception:
+                    iou_list[i] = boundary_iou(A, B)
+            else:
+                iou_list[i] = boundary_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 

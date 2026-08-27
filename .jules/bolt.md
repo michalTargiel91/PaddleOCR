@@ -1,0 +1,3 @@
+## 2024-03-24 - Precomputing Shapely polygons speeds up poly_nms
+**Learning:** In `ppocr/utils/poly_nms.py`, the `poly_nms` function was converting coordinate arrays into Shapely polygons on every single iteration of an O(n^2) inner loop (via `boundary_iou`). Precomputing the polygons before the inner loop and caching them along with their areas avoids redundant conversions and significantly reduces execution time. Also, we must *not* pre-buffer the polygons (e.g., `poly.buffer(0.0001)`) as that adds vertices and makes intersection slower. Simply precomputing `poly` and its `area` is sufficient.
+**Action:** Always precompute and cache object conversions (like numpy to Shapely Polygon) outside of nested loops when calculating pair-wise metrics.
