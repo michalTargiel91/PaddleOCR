@@ -129,17 +129,57 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Precompute Shapely polygons and areas to avoid recreating them in the NMS loop
+    poly_cache = []
+    for p in polygons:
+        pts = p[:-1]
+        try:
+            poly = Polygon(np.array(pts).reshape([-1, 2]))
+            area = poly.area
+        except Exception:
+            poly = None
+            area = 0.0
+        poly_cache.append((poly, area))
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+
+        idx_A = index[-1]
+        poly_A, area_A = poly_cache[idx_A]
+        A = polygons[idx_A][:-1]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+
+        if poly_A is not None:
+            for i in range(len(index)):
+                idx_B = index[i]
+                poly_B, area_B = poly_cache[idx_B]
+
+                iou = 0.0
+                if poly_B is not None:
+                    try:
+                        inter = poly_A.intersection(poly_B)
+                        area_inter = inter.area
+                        area_union = area_A + area_B - area_inter
+                        if area_union > 0:
+                            iou = area_inter / area_union
+                    except Exception:
+                        B = polygons[idx_B][:-1]
+                        iou = boundary_iou(A, B)
+                else:
+                    B = polygons[idx_B][:-1]
+                    iou = boundary_iou(A, B)
+                iou_list[i] = iou
+        else:
+            for i in range(len(index)):
+                idx_B = index[i]
+                B = polygons[idx_B][:-1]
+                iou_list[i] = boundary_iou(A, B)
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
