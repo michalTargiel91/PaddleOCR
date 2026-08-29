@@ -1,0 +1,3 @@
+## 2024-08-29 - Optimize poly_nms by caching Shapely Polygons
+**Learning:** In highly repetitive geometric loops like `poly_nms`, creating Shapely `Polygon` objects inside the inner loop causes massive overhead. However, pre-buffering them (`poly.buffer(0.0001)`) adds vertices and makes intersection operations excessively slow, completely negating the caching benefits.
+**Action:** Cache the base `Polygon` and its area without buffering. Perform standard `.intersection()` in the inner loop, wrapping in `try...except` to fall back gracefully to the original helper for invalid/irregular polygons.
