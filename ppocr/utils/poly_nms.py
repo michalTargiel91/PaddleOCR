@@ -132,14 +132,48 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # ⚡ Bolt Optimization: Precompute Shapely polygons and their areas.
+    # The original implementation repeatedly instantiated polygons inside `boundary_iou`
+    # within a nested loop O(N^2). By precomputing the objects and areas, we save
+    # significant overhead.
+    shapely_polys = []
+    for p in polygons:
+        poly_pts = p[:-1]
+        poly = None
+        area = 0.0
+        try:
+            poly = Polygon(np.array(poly_pts).reshape([-1, 2]))
+            if poly is not None:
+                area = poly.area
+        except Exception:
+            poly = None
+        shapely_polys.append((poly, area))
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_pts = polygons[index[-1]][:-1]
+        A_poly, A_area = shapely_polys[index[-1]]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            B_pts = polygons[index[i]][:-1]
+            B_poly, B_area = shapely_polys[index[i]]
+
+            iou = 0.0
+            if A_poly is not None and B_poly is not None and A_area > 0 and B_area > 0:
+                try:
+                    inter_area = A_poly.intersection(B_poly).area
+                    union_area = A_area + B_area - inter_area
+                    if union_area > 0:
+                        iou = inter_area / union_area
+                except Exception:
+                    # Fallback to the original unoptimized helper function
+                    # if Shapely throws a topological error
+                    iou = boundary_iou(A_pts, B_pts)
+            else:
+                iou = boundary_iou(A_pts, B_pts)
+
+            iou_list[i] = iou
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
