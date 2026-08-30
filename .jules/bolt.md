@@ -1,0 +1,3 @@
+## 2025-01-20 - Optimize poly_nms with Shapely
+**Learning:** Pre-buffering polygons in the `poly_nms` inner loop (`poly_det.buffer(buffer) & poly_gt.buffer(buffer)`) drastically reduces performance, especially on many polygons. Avoid pre-buffering. Just caching the Polygon object and intersection them natively without buffer is much faster. In addition, falling back to `boundary_iou` within a `try-except` block on error handles specific Shapely topological errors.
+**Action:** When working with many geometric intersections, pre-compute geometric objects and minimize topological complexity inside inner loops, falling back when needed instead of predicting errors.
