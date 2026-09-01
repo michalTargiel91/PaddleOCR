@@ -15,6 +15,7 @@
 import sys
 import tarfile
 import os
+import subprocess
 import time
 import datetime
 import functools
@@ -488,7 +489,10 @@ class APP_Image2Doc(QWidget):
             if platform.system() == "Windows":
                 os.startfile(self.output_dir)
             else:
-                os.system("open " + os.path.normpath(self.output_dir))
+                try:
+                    subprocess.run(["open", os.path.normpath(self.output_dir)])
+                except Exception:
+                    pass
         else:
             QMessageBox.information(self, "Information", "输出文件不存在")
 
