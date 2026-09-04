@@ -118,7 +118,7 @@ def poly_iou(poly_det, poly_gt):
     assert isinstance(poly_det, Polygon)
     assert isinstance(poly_gt, Polygon)
     area_inters, _ = poly_intersection(poly_det, poly_gt)
-    area_union = poly_union(poly_det, poly_gt)
+    area_union = poly_det.area + poly_gt.area - area_inters
     if area_union == 0:
         return 0.0
     return area_inters / area_union
@@ -132,14 +132,32 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    shapely_polys = []
+    for i in range(polygons.shape[0]):
+        try:
+            poly = Polygon(polygons[i][:-1].reshape([-1, 2]))
+        except Exception:
+            poly = None
+        shapely_polys.append(poly)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        A_idx = index[-1]
+        A_poly = shapely_polys[A_idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+
+        if A_poly is not None:
+            A_area = A_poly.area
+            for i in range(len(index)):
+                B_idx = index[i]
+                B_poly = shapely_polys[B_idx]
+                if B_poly is not None:
+                    area_inters, _ = poly_intersection(A_poly, B_poly)
+                    area_union = A_area + B_poly.area - area_inters
+                    if area_union > 0:
+                        iou_list[i] = area_inters / area_union
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
