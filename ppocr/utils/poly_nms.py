@@ -126,20 +126,54 @@ def poly_iou(poly_det, poly_gt):
 
 def poly_nms(polygons, threshold):
     assert isinstance(polygons, list)
+    if len(polygons) == 0:
+        return []
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Pre-compute Polygon objects and their buffered versions
+    # to avoid redundant conversions and buffering in the O(N^2) loop.
+    poly_objects = []
+
+    for i in range(polygons.shape[0]):
+        try:
+            # Buffer by 0.0001 once instead of in every intersection check
+            p = Polygon(polygons[i][:-1].reshape([-1, 2]))
+            p_buf = p.buffer(0.0001)
+            # Store tuple of (buffered_polygon, area)
+            poly_objects.append((p_buf, p.area))
+        except Exception:
+            poly_objects.append((None, 0.0))
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+
+        curr_idx = index[-1]
+        A_poly_buf, area_A = poly_objects[curr_idx]
+
         index = np.delete(index, -1)
+        if len(index) == 0:
+            break
+
         iou_list = np.zeros((len(index),))
-        for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+
+        if A_poly_buf is not None:
+            for i in range(len(index)):
+                B_idx = index[i]
+                B_poly_buf, area_B = poly_objects[B_idx]
+
+                if B_poly_buf is not None:
+                    poly_inter = A_poly_buf & B_poly_buf
+                    area_inters = poly_inter.area
+
+                    if area_inters > 0:
+                        area_union = area_A + area_B - area_inters
+                        if area_union > 0:
+                            iou_list[i] = area_inters / area_union
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
