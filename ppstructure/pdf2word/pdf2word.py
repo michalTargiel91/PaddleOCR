@@ -488,7 +488,11 @@ class APP_Image2Doc(QWidget):
             if platform.system() == "Windows":
                 os.startfile(self.output_dir)
             else:
-                os.system("open " + os.path.normpath(self.output_dir))
+                import subprocess
+                try:
+                    subprocess.run(["open", os.path.normpath(self.output_dir)], check=False)
+                except Exception:
+                    pass
         else:
             QMessageBox.information(self, "Information", "输出文件不存在")
 
