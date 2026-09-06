@@ -1,0 +1,3 @@
+## 2024-05-15 - Precomputing Shapely Polygons for NMS
+**Learning:** Instantiating Shapely Polygons inside O(N^2) NMS loops is a performance bottleneck, but aggressive optimizations (like pre-buffering) can break safety guarantees or backward compatibility. Precomputing standard Shapely valid objects and relying on safe existing math functions like `poly_iou` reduces redundancy safely.
+**Action:** Precompute Shapely Polygon objects once outside the loop instead of redundantly converting lists to arrays in every `boundary_iou` call, but avoid aggressively overriding standard intersection logic that handles overlaps correctly.
