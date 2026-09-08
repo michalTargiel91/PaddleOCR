@@ -1,0 +1,3 @@
+## 2024-05-24 - Precomputing Shapely polygons in PaddleOCR poly_nms
+**Learning:** In PaddleOCR's polygon NMS implementation, repeated conversions from arrays to Shapely Polygons inside an O(N^2) loop was causing significant performance overhead. Moving the `Polygon` instantiation outside the loop and safely handling invalid geometries during precomputation substantially improves execution speed without compromising accuracy.
+**Action:** Always look for O(N^2) or nested loops where complex objects are repeatedly instantiated from the same base data. Extract such instantiations into a precomputation step (O(N)), storing the results to be accessed during the intensive comparisons.
