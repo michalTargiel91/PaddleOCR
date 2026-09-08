@@ -132,14 +132,39 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Precompute Shapely polygons to avoid redundant conversions
+    shapely_polys = []
+    for p in polygons:
+        try:
+            poly = Polygon(np.array(p[:-1]).reshape([-1, 2]))
+        except Exception:
+            poly = None
+        shapely_polys.append(poly)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
         A = polygons[index[-1]][:-1]
+        poly_a = shapely_polys[index[-1]]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
             B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            poly_b = shapely_polys[index[i]]
+            if poly_a is not None and poly_b is not None:
+                # Direct calculation if both are valid polygons
+                try:
+                    iou_list[i] = poly_iou(poly_a, poly_b)
+                except Exception:
+                    iou_list[i] = 0.0
+            else:
+                # Fallback to the original method if invalid
+                try:
+                    iou_list[i] = boundary_iou(A, B)
+                except Exception:
+                    iou_list[i] = 0.0
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
