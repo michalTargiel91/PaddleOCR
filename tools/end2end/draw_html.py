@@ -52,7 +52,7 @@ def draw_debug_img(args):
             base = "{}/{}".format(path, filename)
             html.write("<tr>\n")
             html.write(f"<td> {filename}\n GT")
-            html.write(f'<td>GT\n<img src="{base}" width={args.width}></td>')
+            html.write(f'<td>GT\n<img src="{base}" width={args.width} alt="{filename}"></td>')
 
             html.write("</tr>\n")
         html.write("<style>\n")
