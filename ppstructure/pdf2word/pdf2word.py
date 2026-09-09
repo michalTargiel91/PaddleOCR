@@ -20,6 +20,7 @@ import datetime
 import functools
 import cv2
 import platform
+import subprocess
 import numpy as np
 from paddle.utils import try_import
 
@@ -488,7 +489,13 @@ class APP_Image2Doc(QWidget):
             if platform.system() == "Windows":
                 os.startfile(self.output_dir)
             else:
-                os.system("open " + os.path.normpath(self.output_dir))
+                try:
+                    if platform.system() == "Darwin":
+                        subprocess.run(["open", self.output_dir])
+                    else:
+                        subprocess.run(["xdg-open", self.output_dir])
+                except Exception:
+                    pass
         else:
             QMessageBox.information(self, "Information", "输出文件不存在")
 
