@@ -132,14 +132,42 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Pre-compute buffered polygons and areas to optimize the O(N^2) loop
+    buffered_polygons = []
+    areas = []
+    for p in polygons:
+        poly = points2polygon(p[:-1])
+        buffered_polygons.append(poly.buffer(0.0001))
+        areas.append(poly.area)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+
+        idx = index[-1]
+        poly_a_buf = buffered_polygons[idx]
+        area_a = areas[idx]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            idx_b = index[i]
+            poly_b_buf = buffered_polygons[idx_b]
+            area_b = areas[idx_b]
+
+            # Intersection (using buffered polygons)
+            poly_inter = poly_a_buf & poly_b_buf
+            area_inters = poly_inter.area
+
+            # Union (using unbuffered areas as in original code)
+            area_union = area_a + area_b - area_inters
+
+            if area_union == 0:
+                iou = 0.0
+            else:
+                iou = area_inters / area_union
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
