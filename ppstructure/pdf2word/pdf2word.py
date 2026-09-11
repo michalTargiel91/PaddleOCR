@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import sys
+import subprocess
+
 import tarfile
 import os
 import time
@@ -488,7 +490,7 @@ class APP_Image2Doc(QWidget):
             if platform.system() == "Windows":
                 os.startfile(self.output_dir)
             else:
-                os.system("open " + os.path.normpath(self.output_dir))
+                subprocess.run(["open", os.path.normpath(self.output_dir)])
         else:
             QMessageBox.information(self, "Information", "输出文件不存在")
 
