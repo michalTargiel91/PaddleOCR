@@ -132,14 +132,56 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    shapely_polygons = []
+    for i in range(polygons.shape[0]):
+        poly_points = polygons[i][:-1]
+        is_valid = valid_boundary(poly_points, False)
+        try:
+            poly = points2polygon(poly_points)
+            buffered_poly = poly.buffer(0.0001)
+            shapely_polygons.append({
+                'valid': is_valid,
+                'poly': poly,
+                'buffered': buffered_poly,
+                'area': poly.area
+            })
+        except Exception:
+            shapely_polygons.append({
+                'valid': is_valid,
+                'poly': None,
+                'buffered': None,
+                'area': 0.0
+            })
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
         A = polygons[index[-1]][:-1]
+        a_dict = shapely_polygons[index[-1]]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
+        assert a_dict['valid']
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            b_dict = shapely_polygons[index[i]]
+            assert b_dict['valid']
+
+            if a_dict['buffered'] is None or b_dict['buffered'] is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                poly_inter = a_dict['buffered'].intersection(b_dict['buffered'])
+                area_inters = poly_inter.area
+            except Exception:
+                area_inters = 0.0
+
+            area_union = a_dict['area'] + b_dict['area'] - area_inters
+            if area_union == 0:
+                iou_list[i] = 0.0
+            else:
+                iou_list[i] = area_inters / area_union
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
