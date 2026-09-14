@@ -1,0 +1,3 @@
+## 2024-09-14 - Optimize poly_nms by precomputing Shapely polygons
+**Learning:** `boundary_iou` inside O(N^2) NMS loops recalculates Shapely polygons (`points2polygon`) and buffered/unbuffered areas for the same polygons repeatedly. Recreating Shapely objects in the innermost loop is extremely slow.
+**Action:** Precompute Shapely polygons, areas, and `.buffer(0.0001)` outputs outside the NMS loop. Keep the invariant `assert valid_boundary(A, False)` outside the inner loop. When removing `boundary_iou`, handle `points2polygon` exceptions to provide `0.0` area and `None` buffer, matching the original fallback behavior if they fail.
