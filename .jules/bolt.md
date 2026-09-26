@@ -1,0 +1,3 @@
+## 2024-09-26 - Precompute Shapely Polygons for NMS loop optimization
+**Learning:** In OCR processing, `poly_nms` can become an $O(N^2)$ bottleneck because `boundary_iou` continually reconstructs Shapely `Polygon` objects and executes expensive `.buffer(0.0001)` calls for every comparison. Precomputing the invariant `A` polygon inside the outer loop and calculating the `Polygon` conversions/buffered states once in an $O(N)$ step before the loop starts mitigates the bottleneck.
+**Action:** Always inspect nested loops in geometric or computer vision post-processing scripts for redundant Shapely/OpenCV object instantiations and buffer calculations, extracting these to precomputation arrays.
