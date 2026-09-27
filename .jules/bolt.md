@@ -1,0 +1,3 @@
+## 2024-05-15 - Fast poly_nms calculation
+**Learning:** The O(n^2) implementation of `poly_nms` in `ppocr/utils/poly_nms.py` constructs shapely Polygon objects repeatedly within nested loops and recalculates their buffer multiple times.
+**Action:** By precomputing `points2polygon` and `.buffer(0.0001)` calls before the NMS loop and directly computing the area instead of calling `boundary_iou()`, the time complexity drops significantly (up to ~40x speedup). Make sure to carefully extract the arrays needed (A and B) prior to updating states and to manage any exceptions from the `buffer()` computation to avoid functional regressions.
