@@ -129,17 +129,52 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Precompute Shapely polygons to avoid O(N^2) recreation
+    poly_info = []
+    for poly_arr in polygons:
+        pts = poly_arr[:-1]
+        info = {'buffered': None, 'area': 0.0}
+        if valid_boundary(pts, False):
+            try:
+                poly = points2polygon(pts)
+                info['buffered'] = poly.buffer(0.0001)
+                info['area'] = info['buffered'].area
+            except Exception:
+                pass
+        poly_info.append(info)
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+
+        idx_A = index[-1]
+        poly_a_info = poly_info[idx_A]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            idx_B = index[i]
+            poly_b_info = poly_info[idx_B]
+
+            if poly_a_info['buffered'] is None or poly_b_info['buffered'] is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                poly_inter = poly_a_info['buffered'].intersection(poly_b_info['buffered'])
+                area_inters = poly_inter.area
+            except Exception:
+                area_inters = 0.0
+
+            area_union = poly_a_info['area'] + poly_b_info['area'] - area_inters
+            if area_union == 0:
+                iou_list[i] = 0.0
+            else:
+                iou_list[i] = area_inters / area_union
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
