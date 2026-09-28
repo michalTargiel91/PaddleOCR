@@ -1,0 +1,3 @@
+## 2024-05-20 - Optimize NMS by precomputing Shapely objects
+**Learning:** `poly_nms` dynamically calculated areas and re-created Shapely `Polygon` objects recursively using `boundary_iou` within nested loops resulting in O(N^2) object instantiations. Because calculating intersections/unions requires `Polygon.buffer()` and `.area` calls, instantiating them dynamically caused a massive overhead (bottlenecking the algorithm from <0.2s up to 1.5s+ for N=100).
+**Action:** When working with nested bounding box/polygon operations, explicitly check if the objects can be precomputed before the O(N^2) loop to avoid repetitive Shapely allocations. Store them in lists and unpack properties within the loop.
