@@ -117,5 +117,5 @@ def build_post_process(config, global_config=None):
     assert module_name in support_dict, Exception(
         "post process only support {}".format(support_dict)
     )
-    module_class = eval(module_name)(**config)
+    module_class = globals()[module_name](**config)
     return module_class

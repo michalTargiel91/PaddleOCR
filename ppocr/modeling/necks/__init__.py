@@ -53,5 +53,5 @@ def build_neck(config):
         "neck only support {}".format(support_dict)
     )
 
-    module_class = eval(module_name)(**config)
+    module_class = globals()[module_name](**config)
     return module_class
