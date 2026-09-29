@@ -104,7 +104,7 @@ def build_dataloader(config, mode, device, logger, seed=None):
     )
     assert mode in ["Train", "Eval", "Test"], "Mode should be Train, Eval or Test."
 
-    dataset = eval(module_name)(config, mode, logger, seed)
+    dataset = globals()[module_name](config, mode, logger, seed)
     loader_config = config[mode]["loader"]
     batch_size = loader_config["batch_size_per_card"]
     drop_last = loader_config["drop_last"]
@@ -120,7 +120,7 @@ def build_dataloader(config, mode, device, logger, seed=None):
         if "sampler" in config[mode]:
             config_sampler = config[mode]["sampler"]
             sampler_name = config_sampler.pop("name")
-            batch_sampler = eval(sampler_name)(dataset, **config_sampler)
+            batch_sampler = globals()[sampler_name](dataset, **config_sampler)
         else:
             batch_sampler = DistributedBatchSampler(
                 dataset=dataset,

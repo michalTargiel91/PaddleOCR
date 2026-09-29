@@ -148,5 +148,5 @@ def build_backbone(config, model_type):
             model_type, support_dict
         )
     )
-    module_class = eval(module_name)(**config)
+    module_class = globals()[module_name](**config)
     return module_class
