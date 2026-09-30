@@ -50,9 +50,9 @@ def poly_intersection(poly_det, poly_gt, buffer=0.0001):
     assert isinstance(poly_gt, Polygon)
 
     if buffer == 0:
-        poly_inter = poly_det & poly_gt
+        poly_inter = poly_det.intersection(poly_gt)
     else:
-        poly_inter = poly_det.buffer(buffer) & poly_gt.buffer(buffer)
+        poly_inter = poly_det.buffer(buffer).intersection(poly_gt.buffer(buffer))
     return poly_inter.area, poly_inter
 
 
@@ -129,17 +129,62 @@ def poly_nms(polygons, threshold):
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
 
+    # Precompute polygon properties (Shapely Polygon object, buffered polygon, and area)
+    # This optimization extracts expensive Shapely instantiations and `.buffer()`
+    # operations out of the O(N^2) NMS loop into an O(N) pre-processing step,
+    # drastically reducing redundant computations and significantly speeding up poly_nms.
+    shapely_polygons = []
+    for p in polygons:
+        points = p[:-1]
+        poly = None
+        buffered = None
+        area = 0.0
+        try:
+            if valid_boundary(points, False):
+                poly = points2polygon(points)
+                buffered = poly.buffer(0.0001)
+                area = buffered.area
+        except Exception:
+            poly = None
+            buffered = None
+            area = 0.0
+
+        shapely_polygons.append({
+            'poly': poly,
+            'buffered': buffered,
+            'area': area
+        })
+
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
-        A = polygons[index[-1]][:-1]
+        poly_a_dict = shapely_polygons[index[-1]]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            poly_b_dict = shapely_polygons[index[i]]
+
+            if poly_a_dict['buffered'] is None or poly_b_dict['buffered'] is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                poly_inter = poly_a_dict['buffered'].intersection(poly_b_dict['buffered'])
+                area_inters = poly_inter.area
+            except Exception:
+                area_inters = 0.0
+
+            area_union = poly_a_dict['area'] + poly_b_dict['area'] - area_inters
+            if area_union == 0:
+                iou = 0.0
+            else:
+                iou = area_inters / area_union
+
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
