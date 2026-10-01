@@ -125,9 +125,24 @@ def poly_iou(poly_det, poly_gt):
 
 
 def poly_nms(polygons, threshold):
+    # ⚡ Bolt: Optimize NMS by precomputing Shapely polygons and inlining IOU calculations
     assert isinstance(polygons, list)
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
+
+    precomputed_polys = []
+    for poly in polygons:
+        poly_info = {'buffered': None, 'area': 0.0}
+        pts = poly[:-1]
+        try:
+            if valid_boundary(pts, False):
+                shapely_poly = points2polygon(pts)
+                buffered_poly = shapely_poly.buffer(0.0001)
+                poly_info['buffered'] = buffered_poly
+                poly_info['area'] = buffered_poly.area
+        except Exception:
+            pass
+        precomputed_polys.append(poly_info)
 
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
@@ -135,11 +150,30 @@ def poly_nms(polygons, threshold):
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
         A = polygons[index[-1]][:-1]
+        poly_a_dict = precomputed_polys[index[-1]]
+
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
+
         for i in range(len(index)):
-            B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            poly_b_dict = precomputed_polys[index[i]]
+
+            if poly_a_dict['buffered'] is None or poly_b_dict['buffered'] is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                poly_inter = poly_a_dict['buffered'].intersection(poly_b_dict['buffered'])
+                area_inters = poly_inter.area
+            except Exception:
+                area_inters = 0.0
+
+            area_union = poly_a_dict['area'] + poly_b_dict['area'] - area_inters
+            if area_union == 0:
+                iou_list[i] = 0.0
+            else:
+                iou_list[i] = area_inters / area_union
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
