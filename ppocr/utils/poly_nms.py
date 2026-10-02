@@ -125,9 +125,25 @@ def poly_iou(poly_det, poly_gt):
 
 
 def poly_nms(polygons, threshold):
+    # Performance optimization: precompute Shapely polygons
+    # to avoid recreating them in the O(N^2) NMS loop
     assert isinstance(polygons, list)
 
     polygons = np.array(sorted(polygons, key=lambda x: x[-1]))
+
+    precomputed = []
+    for poly in polygons:
+        pts = poly[:-1]
+        poly_info = {'buffered': None, 'area': 0.0, 'valid': False}
+        if valid_boundary(pts, False):
+            poly_info['valid'] = True
+            try:
+                p = points2polygon(pts)
+                poly_info['buffered'] = p.buffer(0.0001)
+                poly_info['area'] = poly_info['buffered'].area
+            except Exception:
+                pass
+        precomputed.append(poly_info)
 
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
@@ -135,11 +151,35 @@ def poly_nms(polygons, threshold):
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
         A = polygons[index[-1]][:-1]
+        poly_a_dict = precomputed[index[-1]]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
             B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            poly_b_dict = precomputed[index[i]]
+
+            if not poly_a_dict['valid'] or not poly_b_dict['valid']:
+                try:
+                    iou_list[i] = boundary_iou(A, B)
+                except Exception:
+                    iou_list[i] = 0.0
+                continue
+
+            if poly_a_dict['buffered'] is None or poly_b_dict['buffered'] is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                inter_area = poly_a_dict['buffered'].intersection(poly_b_dict['buffered']).area
+            except Exception:
+                inter_area = 0.0
+
+            union_area = poly_a_dict['area'] + poly_b_dict['area'] - inter_area
+            if union_area == 0:
+                iou_list[i] = 0.0
+            else:
+                iou_list[i] = inter_area / union_area
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
