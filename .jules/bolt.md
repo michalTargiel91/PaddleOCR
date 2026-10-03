@@ -1,0 +1,3 @@
+## 2024-05-24 - Precomputing Shapely Polygons in NMS Loop
+**Learning:** Creating Shapely Polygon objects (`points2polygon`) and calculating their buffers (`.buffer(0.0001)`) inside an O(N^2) Non-Maximum Suppression (NMS) loop is a massive performance bottleneck due to the high object instantiation overhead.
+**Action:** Precompute these objects and their areas outside the nested loops down to O(N) complexity, mapping them by index to access them inside the O(N^2) loop. Use `.intersection()` safely instead of bitwise `&` to handle topological exceptions gracefully, reducing processing time substantially (e.g., from ~62.18s to ~2.79s for 600 polygons).
