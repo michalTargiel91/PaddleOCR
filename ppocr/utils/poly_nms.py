@@ -132,14 +132,52 @@ def poly_nms(polygons, threshold):
     keep_poly = []
     index = [i for i in range(polygons.shape[0])]
 
+    # Precompute Shapely polygons to optimize O(N^2) NMS loops
+    precomputed_polys = []
+    for poly_arr in polygons:
+        poly_info = {'buffered': None, 'area': 0.0}
+        pts = poly_arr[:-1]
+        if valid_boundary(pts, False):
+            try:
+                poly = points2polygon(pts)
+                buffered = poly.buffer(0.0001)
+                poly_info['buffered'] = buffered
+                poly_info['area'] = buffered.area
+            except Exception:
+                pass
+        precomputed_polys.append(poly_info)
+
     while len(index) > 0:
         keep_poly.append(polygons[index[-1]].tolist())
         A = polygons[index[-1]][:-1]
+        poly_a_dict = precomputed_polys[index[-1]]
         index = np.delete(index, -1)
         iou_list = np.zeros((len(index),))
         for i in range(len(index)):
             B = polygons[index[i]][:-1]
-            iou_list[i] = boundary_iou(A, B)
+            poly_b_dict = precomputed_polys[index[i]]
+
+            if not valid_boundary(A, False) or not valid_boundary(B, False):
+                iou_list[i] = 0.0
+                continue
+
+            if poly_a_dict['buffered'] is None or poly_b_dict['buffered'] is None:
+                iou_list[i] = 0.0
+                continue
+
+            try:
+                inter = poly_a_dict['buffered'].intersection(poly_b_dict['buffered'])
+                area_inters = inter.area
+            except Exception:
+                area_inters = 0.0
+
+            area_union = poly_a_dict['area'] + poly_b_dict['area'] - area_inters
+            if area_union == 0:
+                iou = 0.0
+            else:
+                iou = area_inters / area_union
+            iou_list[i] = iou
+
         remove_index = np.where(iou_list > threshold)
         index = np.delete(index, remove_index)
 
