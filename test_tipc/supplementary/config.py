@@ -38,7 +38,7 @@ class ArgsParser(ArgumentParser):
         for s in opts:
             s = s.strip()
             k, v = s.split("=")
-            config[k] = yaml.load(v, Loader=yaml.Loader)
+            config[k] = yaml.safe_load(v)
         return config
 
 
@@ -74,7 +74,7 @@ def load_config(file_path):
     merge_config(default_config)
     _, ext = os.path.splitext(file_path)
     assert ext in [".yml", ".yaml"], "only support yaml files for now"
-    merge_config(yaml.load(open(file_path, "rb"), Loader=yaml.Loader))
+    merge_config(yaml.safe_load(open(file_path, "rb")))
     return global_config
 
 
